@@ -189,7 +189,6 @@ class AutoClickAccessibilityService : AccessibilityService() {
                         var found = false
                         repeat(trigger.maxRetries) {
                             delay(trigger.retryDelayMs)
-                            ensureActive()
                             if (checkColorTrigger(trigger)) { found = true; return@repeat }
                         }
                         if (!found) return false
