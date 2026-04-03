@@ -1,0 +1,132 @@
+<resources>
+    <string name="app_name">AutoClicker</string>
+    <string name="accessibility_service_label">AutoClicker 자동 클릭</string>
+    <string name="accessibility_service_description">화면의 지정된 위치를 자동으로 터치합니다. 게임 자동화, 반복 작업 등에 활용하세요.</string>
+
+    <!-- 메인 화면 -->
+    <string name="title_click_point">클릭 포인트</string>
+    <string name="hint_x_coord">X 좌표</string>
+    <string name="hint_y_coord">Y 좌표</string>
+    <string name="hint_delay">딜레이 (ms)</string>
+    <string name="hint_repeat">시퀀스 반복 (0 = 무한, 1회 = 포인트 전체 1바퀴)</string>
+    <string name="section_click_points">클릭 포인트 목록</string>
+    <string name="hint_drag_reorder">≡ 을 끌어 올리거나 내려 순서를 바꿀 수 있습니다.</string>
+    <string name="btn_add_point">포인트 추가</string>
+    <string name="btn_delete_point">삭제</string>
+    <string name="hint_point_label">이름 (선택)</string>
+    <string name="hint_point_delay_after">이 클릭 후 딜레이 ms (비우면 공통)</string>
+    <string name="delay_uses_global">공통 딜레이</string>
+    <string name="delay_until_next">다음까지 %s</string>
+    <string name="toast_max_points">포인트는 최대 50개까지입니다.</string>
+    <string name="toast_need_one_point">포인트를 1개 이상 추가하세요.</string>
+    <string name="click_count_fmt">클릭 횟수: %d</string>
+    <string name="overlay_idle">대기</string>
+    <string name="overlay_click_fmt">클릭: %d</string>
+
+    <string name="section_quick_toggle">빠른 시작/정지</string>
+    <string name="switch_volume_hotkey">볼륨 아래 키로 토글</string>
+    <string name="hint_volume_hotkey">켜면 볼륨 다운 키가 시퀀스 시작/정지로 동작하고, 해당 키로는 음량이 바뀌지 않습니다. 접근성 설정 변경 후 서비스를 한 번 껐다 켜 주세요.</string>
+    <string name="hint_qs_tile">알림 패널을 펼친 뒤 연필(편집)에서 오토클릭 타일을 추가하면 같은 방식으로 토글할 수 있습니다.</string>
+    <string name="tile_label">오토클릭</string>
+
+    <string name="hint_gesture_type">제스처</string>
+    <string name="hint_end_x">끝 X (스와이프)</string>
+    <string name="hint_end_y">끝 Y (스와이프)</string>
+    <string name="hint_swipe_duration">스와이프 지속(ms)</string>
+    <string name="hint_long_press_ms">누르는 시간(ms)</string>
+    <string name="toast_swipe_need_end">스와이프는 끝 X, Y를 입력하세요.</string>
+    <string name="gesture_label_tap">탭</string>
+    <string name="gesture_label_long">롱 %dms</string>
+    <string name="gesture_label_swipe">스와이프 %1$d,%2$d→%3$d,%4$d (%5$dms)</string>
+    <string name="point_row_detail_fmt">%1$s · (%2$d,%3$d) · 다음까지 %4$s</string>
+    <string name="btn_start">시작</string>
+    <string name="btn_stop">정지</string>
+    <string name="btn_enable_accessibility">접근성 권한 설정</string>
+    <string name="btn_enable_overlay">오버레이 권한 설정</string>
+
+    <!-- 프로필 관리 -->
+    <string name="title_profile_manager">프로필 관리</string>
+    <string name="btn_profile_manager">프로필 관리</string>
+    <string name="btn_save_current_profile">현재 설정 저장</string>
+    <string name="btn_import_profile">파일에서 가져오기</string>
+    <string name="btn_profile_load">불러오기</string>
+    <string name="btn_profile_export">내보내기</string>
+    <string name="btn_profile_set_app">앱 연동</string>
+    <string name="btn_delete">삭제</string>
+    <string name="btn_save">저장</string>
+    <string name="btn_set">설정</string>
+    <string name="hint_profile_name">프로필 이름</string>
+    <string name="hint_app_package">앱 패키지명 (비우면 해제)</string>
+    <string name="hint_profile_load">불러오기를 누르면 해당 프로필이 메인 화면에 적용됩니다.</string>
+    <string name="hint_no_profiles">저장된 프로필이 없습니다.\n현재 설정을 저장해 보세요.</string>
+    <string name="dialog_save_profile_title">프로필로 저장</string>
+    <string name="dialog_delete_profile_title">프로필 삭제</string>
+    <string name="dialog_delete_profile_msg">\'%s\'을 삭제하시겠습니까?</string>
+    <string name="dialog_set_app_title">앱 자동 연동</string>
+    <string name="dialog_set_app_msg">이 앱이 포그라운드로 오면 이 프로필을 자동 로드합니다.\n예: com.example.game</string>
+    <string name="toast_export_done">\'%s\' 내보내기 완료</string>
+    <string name="toast_export_fail">내보내기 실패</string>
+    <string name="toast_import_done">\'%s\' 가져오기 완료</string>
+    <string name="toast_import_fail">가져오기 실패</string>
+    <string name="toast_import_invalid">올바른 프로필 파일이 아닙니다.</string>
+    <string name="toast_no_points_to_save">저장할 포인트가 없습니다.</string>
+    <string name="toast_enter_name">이름을 입력하세요.</string>
+    <string name="toast_profile_saved">\'%s\' 저장됨</string>
+    <string name="toast_profile_loaded">\'%s\' 프로필이 로드되었습니다.</string>
+    <string name="toast_app_linked">\'%s\' 앱에 연동됨</string>
+    <string name="toast_app_link_removed">앱 연동이 해제됨</string>
+    <string name="toast_profile_loaded_generic">프로필이 로드되었습니다.</string>
+    <string name="toast_auto_profile_loaded">앱 감지: \'%s\' 프로필 자동 로드됨</string>
+
+    <!-- 트리거 -->
+    <string name="cb_trigger_enabled">색상 트리거 사용</string>
+    <string name="hint_trigger_check_x">확인 X</string>
+    <string name="hint_trigger_check_y">확인 Y</string>
+    <string name="hint_trigger_color">목표 색상 (#RRGGBB)</string>
+    <string name="hint_trigger_tolerance">허용 오차 (0~255)</string>
+    <string name="hint_trigger_action">조건 불일치 시</string>
+    <string name="hint_trigger_max_retries">최대 재시도</string>
+    <string name="hint_trigger_retry_delay">재시도 간격 ms</string>
+    <string name="hint_trigger_api_note">※ 색상 감지는 Android 11(API 30) 이상에서 동작합니다.</string>
+    <string name="toast_trigger_need_coords">트리거 확인 좌표(X, Y)를 입력하세요.</string>
+    <string name="toast_trigger_invalid_color">색상 형식이 올바르지 않습니다. (#RRGGBB)</string>
+    <string name="trigger_action_skip">스킵</string>
+    <string name="trigger_action_retry">재시도</string>
+
+    <!-- 통계/로그 -->
+    <string name="title_stats">통계 및 로그</string>
+    <string name="btn_stats">통계/로그</string>
+    <string name="btn_export_log">로그 내보내기</string>
+    <string name="stat_start_fmt">세션 시작: %s</string>
+    <string name="stat_elapsed_fmt">경과: %d초</string>
+    <string name="stat_clicks_fmt">클릭 %d회</string>
+    <string name="stat_skips_fmt">스킵 %d회</string>
+    <string name="hint_no_logs">로그 없음. 시퀀스를 실행하면 기록됩니다.</string>
+    <string name="toast_log_exported">로그 내보내기 완료</string>
+    <string name="toast_log_export_fail">로그 내보내기 실패</string>
+
+    <!-- 랜덤 딜레이 -->
+    <string name="hint_random_delay_min">랜덤 딜레이 최소 ms (0 = 비활성)</string>
+    <string name="hint_random_delay_max">랜덤 딜레이 최대 ms</string>
+    <string name="hint_random_delay_note">최소·최대를 모두 설정하면 고정 딜레이 대신 해당 범위의 랜덤 값을 사용합니다.</string>
+
+    <!-- 설정 -->
+    <string name="title_settings">설정</string>
+    <string name="btn_settings">설정</string>
+    <string name="section_theme">테마</string>
+    <string name="theme_system">시스템 기본</string>
+    <string name="theme_light">라이트</string>
+    <string name="theme_dark">다크</string>
+    <string name="section_accessibility">접근성 서비스</string>
+    <string name="hint_accessibility_desc">자동 클릭이 작동하려면 접근성 서비스가 활성화되어야 합니다.</string>
+    <string name="section_app_info">앱 정보</string>
+    <string name="label_version">버전: %s</string>
+
+    <!-- 상태 메시지 -->
+    <string name="status_idle">대기 중</string>
+    <string name="status_running">실행 중...</string>
+    <string name="status_accessibility_off">⚠ 접근성 서비스가 비활성화되어 있습니다</string>
+    <string name="status_accessibility_on">✓ 접근성 서비스 활성화됨</string>
+    <string name="status_overlay_off">⚠ 오버레이 권한이 없습니다</string>
+    <string name="status_overlay_on">✓ 오버레이 권한 허용됨</string>
+</resources>

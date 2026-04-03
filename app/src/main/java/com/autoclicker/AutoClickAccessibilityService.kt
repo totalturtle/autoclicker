@@ -1,0 +1,265 @@
+package com.autoclicker
+
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.Path
+import android.os.Build
+import android.os.SystemClock
+import android.view.Display
+import android.view.KeyEvent
+import android.view.accessibility.AccessibilityEvent
+import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
+import kotlin.coroutines.resume
+import kotlinx.coroutines.*
+
+/**
+ * 접근성 제스처로 탭/롱프레스/스와이프 실행.
+ * 브로드캐스트·Quick Tile·볼륨(설정 시)으로 시작/정지.
+ */
+class AutoClickAccessibilityService : AccessibilityService() {
+
+    companion object {
+        const val ACTION_START = "com.autoclicker.ACTION_START"
+        const val ACTION_STOP = "com.autoclicker.ACTION_STOP"
+        const val ACTION_TOGGLE = "com.autoclicker.ACTION_TOGGLE"
+        const val ACTION_CLICK_COUNT = "com.autoclicker.ACTION_CLICK_COUNT"
+        const val ACTION_STARTED = "com.autoclicker.ACTION_STARTED"
+        const val ACTION_AUTO_PROFILE = "com.autoclicker.ACTION_AUTO_PROFILE"
+
+        const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
+        const val EXTRA_COUNT = "extra_count"
+        const val EXTRA_PROFILE_NAME = "extra_profile_name"
+
+        var instance: AutoClickAccessibilityService? = null
+            private set
+
+        val isRunning: Boolean
+            get() = instance?.isClickJobActive == true
+    }
+
+    val isClickJobActive: Boolean get() = clickJob?.isActive == true
+
+    private var lastDetectedPackage = ""
+
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var clickJob: Job? = null
+    private var lastVolumeToggleUptime = 0L
+
+    private val commandReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                ACTION_START -> {
+                    val json = intent.getStringExtra(EXTRA_SEQUENCE_JSON)
+                    val config = ClickSequenceConfig.fromJsonString(json) ?: return
+                    startClicking(config)
+                }
+                ACTION_STOP -> stopClicking()
+                ACTION_TOGGLE -> toggleRun()
+            }
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+
+        val filter = IntentFilter().apply {
+            addAction(ACTION_START)
+            addAction(ACTION_STOP)
+            addAction(ACTION_TOGGLE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(commandReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(commandReceiver, filter)
+        }
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        event ?: return
+        if (event.eventType != android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        if (pkg == packageName || pkg == lastDetectedPackage) return
+        lastDetectedPackage = pkg
+
+        val profile = ProfileManager.findByApp(this, pkg) ?: return
+        SequencePrefs.save(this, profile.config)
+        sendBroadcast(Intent(ACTION_AUTO_PROFILE).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_PROFILE_NAME, profile.name)
+        })
+    }
+
+    override fun onInterrupt() {
+        stopClicking()
+    }
+
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) {
+            return super.onKeyEvent(event)
+        }
+        if (!SequencePrefs.isVolumeHotkeyEnabled(this)) {
+            return super.onKeyEvent(event)
+        }
+        if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return super.onKeyEvent(event)
+        }
+        val now = SystemClock.uptimeMillis()
+        if (now - lastVolumeToggleUptime < 450L) {
+            return true
+        }
+        lastVolumeToggleUptime = now
+        toggleRun()
+        return true
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
+        stopClicking()
+        runCatching { unregisterReceiver(commandReceiver) }
+        serviceScope.cancel()
+    }
+
+    private fun toggleRun() {
+        if (clickJob?.isActive == true) {
+            stopClicking()
+            broadcastStop()
+        } else {
+            val cfg = SequencePrefs.load(this) ?: return
+            if (cfg.points.isEmpty()) return
+            startClicking(cfg)
+        }
+    }
+
+    private fun startClicking(config: ClickSequenceConfig) {
+        stopClicking()
+        if (config.points.isEmpty()) return
+
+        broadcastStarted()
+
+        clickJob = serviceScope.launch {
+            SessionLogger.startSession()
+            val infinite = config.repeatCount == 0
+            var round = 0
+            var totalClicks = 0
+
+            try {
+                while (infinite || round < config.repeatCount) {
+                    for (point in config.points) {
+                        ensureActive()
+                        val clicked = performPoint(point)
+                        if (clicked) {
+                            totalClicks++
+                            broadcastCount(totalClicks)
+                            SessionLogger.logClick(point.label, point.x, point.y)
+                        } else {
+                            SessionLogger.logSkip(point.label, point.x, point.y)
+                        }
+                        delay(config.delayAfter(point))
+                    }
+                    round++
+                }
+                if (!infinite) broadcastStop()
+            } finally {
+                SessionLogger.endSession()
+            }
+        }
+    }
+
+    private fun stopClicking() {
+        clickJob?.cancel()
+        clickJob = null
+    }
+
+    private suspend fun performPoint(p: ClickPoint): Boolean {
+        val trigger = p.trigger
+        if (trigger != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val matched = checkColorTrigger(trigger)
+            if (!matched) {
+                when (trigger.action) {
+                    TriggerAction.SKIP -> return false
+                    TriggerAction.WAIT_RETRY -> {
+                        var found = false
+                        repeat(trigger.maxRetries) {
+                            delay(trigger.retryDelayMs)
+                            ensureActive()
+                            if (checkColorTrigger(trigger)) { found = true; return@repeat }
+                        }
+                        if (!found) return false
+                    }
+                }
+            }
+        }
+        when (p.gesture) {
+            GestureType.TAP -> dispatchStroke(p.x, p.y, p.x, p.y, 50L)
+            GestureType.LONG_PRESS -> dispatchStroke(p.x, p.y, p.x, p.y, p.longPressDurationMs.coerceIn(100L, 60_000L))
+            GestureType.SWIPE -> dispatchStroke(p.x, p.y, p.endX, p.endY, p.swipeDurationMs.coerceIn(50L, 60_000L))
+        }
+        return true
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private suspend fun checkColorTrigger(trigger: TriggerCondition): Boolean =
+        suspendCancellableCoroutine { cont ->
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                ContextCompat.getMainExecutor(this@AutoClickAccessibilityService),
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        runCatching {
+                            val hwBmp = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                            val swBmp = hwBmp?.copy(Bitmap.Config.ARGB_8888, false)
+                            hwBmp?.recycle()
+                            result.hardwareBuffer.close()
+                            val x = trigger.checkX.coerceIn(0, (swBmp?.width ?: 1) - 1)
+                            val y = trigger.checkY.coerceIn(0, (swBmp?.height ?: 1) - 1)
+                            val pixel = swBmp?.getPixel(x, y) ?: android.graphics.Color.TRANSPARENT
+                            swBmp?.recycle()
+                            TriggerCondition.colorMatches(pixel, trigger.targetColor, trigger.tolerance)
+                        }.fold(
+                            onSuccess = { match -> if (cont.isActive) cont.resume(match) },
+                            onFailure = { if (cont.isActive) cont.resume(true) }
+                        )
+                    }
+                    override fun onFailure(errorCode: Int) {
+                        if (cont.isActive) cont.resume(true)
+                    }
+                }
+            )
+        }
+
+    private fun dispatchStroke(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long) {
+        val path = Path().apply {
+            moveTo(x1.toFloat(), y1.toFloat())
+            lineTo(x2.toFloat(), y2.toFloat())
+        }
+        val dur = durationMs.coerceAtLeast(1L)
+        val stroke = GestureDescription.StrokeDescription(path, 0L, dur)
+        val gesture = GestureDescription.Builder()
+            .addStroke(stroke)
+            .build()
+        dispatchGesture(gesture, null, null)
+    }
+
+    private fun broadcastStarted() {
+        sendBroadcast(Intent(ACTION_STARTED).apply { setPackage(packageName) })
+    }
+
+    private fun broadcastCount(count: Int) {
+        sendBroadcast(Intent(ACTION_CLICK_COUNT).apply {
+            putExtra(EXTRA_COUNT, count)
+            setPackage(packageName)
+        })
+    }
+
+    private fun broadcastStop() {
+        sendBroadcast(Intent(ACTION_STOP).apply { setPackage(packageName) })
+    }
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="gesture_type_labels">
+        <item>탭</item>
+        <item>롱 프레스</item>
+        <item>스와이프</item>
+    </string-array>
+    <string-array name="trigger_action_labels">
+        <item>스킵</item>
+        <item>재시도 후 스킵</item>
+    </string-array>
+</resources>

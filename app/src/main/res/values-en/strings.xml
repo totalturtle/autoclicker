@@ -1,0 +1,129 @@
+<resources>
+    <string name="app_name">AutoClicker</string>
+    <string name="accessibility_service_label">AutoClicker Auto-Touch</string>
+    <string name="accessibility_service_description">Automatically taps specified locations on the screen. Use for game automation, repetitive tasks, and more.</string>
+
+    <!-- Main screen -->
+    <string name="title_click_point">Click Point</string>
+    <string name="hint_x_coord">X coordinate</string>
+    <string name="hint_y_coord">Y coordinate</string>
+    <string name="hint_delay">Global delay (ms)</string>
+    <string name="hint_repeat">Repeat (0 = infinite, 1 = one full cycle)</string>
+    <string name="hint_random_delay_min">Random delay min (ms, 0 = off)</string>
+    <string name="hint_random_delay_max">Random delay max (ms)</string>
+    <string name="section_click_points">Click Point List</string>
+    <string name="hint_drag_reorder">Drag ≡ to reorder points.</string>
+    <string name="btn_add_point">Add Point</string>
+    <string name="btn_delete_point">Delete</string>
+    <string name="hint_point_label">Label (optional)</string>
+    <string name="hint_point_delay_after">Delay after this click in ms (blank = global)</string>
+    <string name="delay_uses_global">Global delay</string>
+    <string name="toast_max_points">Maximum 50 points allowed.</string>
+    <string name="toast_need_one_point">Add at least one point.</string>
+    <string name="click_count_fmt">Clicks: %d</string>
+    <string name="overlay_idle">Idle</string>
+    <string name="overlay_click_fmt">Clicks: %d</string>
+
+    <string name="section_quick_toggle">Quick Toggle</string>
+    <string name="switch_volume_hotkey">Volume-Down key to toggle</string>
+    <string name="hint_volume_hotkey">When enabled, the Volume Down key toggles the sequence instead of changing volume. Restart the accessibility service after changing this setting.</string>
+    <string name="hint_qs_tile">Add the AutoClicker tile from the Quick Settings edit panel to toggle the same way.</string>
+    <string name="tile_label">AutoClick</string>
+
+    <string name="hint_gesture_type">Gesture</string>
+    <string name="hint_end_x">End X (swipe)</string>
+    <string name="hint_end_y">End Y (swipe)</string>
+    <string name="hint_swipe_duration">Swipe duration (ms)</string>
+    <string name="hint_long_press_ms">Hold duration (ms)</string>
+    <string name="toast_swipe_need_end">Enter end X and Y for swipe.</string>
+    <string name="gesture_label_tap">Tap</string>
+    <string name="gesture_label_long">Long %dms</string>
+    <string name="gesture_label_swipe">Swipe %1$d,%2$d→%3$d,%4$d (%5$dms)</string>
+    <string name="point_row_detail_fmt">%1$s · (%2$d,%3$d) · next in %4$s</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_enable_accessibility">Open Accessibility Settings</string>
+    <string name="btn_enable_overlay">Grant Overlay Permission</string>
+
+    <!-- Status -->
+    <string name="status_idle">Idle</string>
+    <string name="status_running">Running…</string>
+    <string name="status_accessibility_off">⚠ Accessibility service is disabled</string>
+    <string name="status_accessibility_on">✓ Accessibility service enabled</string>
+    <string name="status_overlay_off">⚠ Overlay permission not granted</string>
+    <string name="status_overlay_on">✓ Overlay permission granted</string>
+
+    <!-- Profile manager -->
+    <string name="title_profile_manager">Profile Manager</string>
+    <string name="btn_profile_manager">Profiles</string>
+    <string name="btn_save_current_profile">Save Current</string>
+    <string name="btn_import_profile">Import from File</string>
+    <string name="btn_profile_load">Load</string>
+    <string name="btn_profile_export">Export</string>
+    <string name="btn_profile_set_app">Link App</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_set">Set</string>
+    <string name="hint_profile_name">Profile name</string>
+    <string name="hint_app_package">App package name (leave blank to unlink)</string>
+    <string name="hint_profile_load">Loading a profile replaces the current point list.</string>
+    <string name="hint_no_profiles">No profiles yet.\nSave the current setup to get started.</string>
+    <string name="dialog_save_profile_title">Save as Profile</string>
+    <string name="dialog_delete_profile_title">Delete Profile</string>
+    <string name="dialog_delete_profile_msg">Delete \'%s\'?</string>
+    <string name="dialog_set_app_title">Link App</string>
+    <string name="dialog_set_app_msg">This profile will auto-load when the linked app comes to the foreground.\nExample: com.example.game</string>
+    <string name="toast_export_done">\'%s\' exported</string>
+    <string name="toast_export_fail">Export failed</string>
+    <string name="toast_import_done">\'%s\' imported</string>
+    <string name="toast_import_fail">Import failed</string>
+    <string name="toast_import_invalid">Not a valid profile file.</string>
+    <string name="toast_no_points_to_save">No points to save.</string>
+    <string name="toast_enter_name">Please enter a name.</string>
+    <string name="toast_profile_saved">\'%s\' saved</string>
+    <string name="toast_profile_loaded">Profile \'%s\' loaded.</string>
+    <string name="toast_app_linked">Linked to \'%s\'</string>
+    <string name="toast_app_link_removed">App link removed</string>
+    <string name="toast_profile_loaded_generic">Profile loaded.</string>
+    <string name="toast_auto_profile_loaded">App detected: \'%s\' profile auto-loaded</string>
+
+    <!-- Trigger -->
+    <string name="cb_trigger_enabled">Use color trigger</string>
+    <string name="hint_trigger_check_x">Check X</string>
+    <string name="hint_trigger_check_y">Check Y</string>
+    <string name="hint_trigger_color">Target color (#RRGGBB)</string>
+    <string name="hint_trigger_tolerance">Tolerance (0–255)</string>
+    <string name="hint_trigger_action">On mismatch</string>
+    <string name="hint_trigger_max_retries">Max retries</string>
+    <string name="hint_trigger_retry_delay">Retry interval ms</string>
+    <string name="hint_trigger_api_note">※ Color detection requires Android 11 (API 30) or later.</string>
+    <string name="toast_trigger_need_coords">Enter trigger check coordinates (X, Y).</string>
+    <string name="toast_trigger_invalid_color">Invalid color format. Use #RRGGBB.</string>
+    <string name="trigger_action_skip">Skip</string>
+    <string name="trigger_action_retry">Retry</string>
+
+    <!-- Stats / Log -->
+    <string name="title_stats">Stats &amp; Log</string>
+    <string name="btn_stats">Stats / Log</string>
+    <string name="btn_export_log">Export Log</string>
+    <string name="stat_start_fmt">Session start: %s</string>
+    <string name="stat_elapsed_fmt">Elapsed: %ds</string>
+    <string name="stat_clicks_fmt">%d clicks</string>
+    <string name="stat_skips_fmt">%d skipped</string>
+    <string name="hint_no_logs">No logs yet. Run a sequence to start recording.</string>
+    <string name="toast_log_exported">Log exported</string>
+    <string name="toast_log_export_fail">Log export failed</string>
+
+    <!-- Settings -->
+    <string name="title_settings">Settings</string>
+    <string name="btn_settings">Settings</string>
+    <string name="section_theme">Theme</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="section_accessibility">Accessibility Service</string>
+    <string name="hint_accessibility_desc">The accessibility service must be enabled for auto-click to work. Tap the button below to open system settings.</string>
+    <string name="section_app_info">App Info</string>
+    <string name="label_version">Version: %s</string>
+    <string name="hint_random_delay_note">When both min and max are set (min &lt; max), a random delay in that range replaces the fixed delay.</string>
+</resources>
