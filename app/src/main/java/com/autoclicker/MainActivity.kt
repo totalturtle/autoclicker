@@ -2,6 +2,7 @@ package com.autoclicker
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -24,6 +25,27 @@ import com.autoclicker.databinding.ActivityMainBinding
 import com.autoclicker.databinding.DialogAddPointBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
+/** 포인트 추가 다이얼로그의 현재 입력 상태 스냅샷 (좌표 피커 왕복 시 복원용) */
+data class PointDialogState(
+    val gesturePos: Int = 0,
+    val x: String = "",
+    val y: String = "",
+    val endX: String = "",
+    val endY: String = "",
+    val swipeDur: String = "350",
+    val longDur: String = "450",
+    val label: String = "",
+    val delayAfter: String = "",
+    val triggerEnabled: Boolean = false,
+    val triggerX: String = "",
+    val triggerY: String = "",
+    val triggerColor: String = "#FF0000",
+    val triggerTolerance: String = "20",
+    val triggerActionPos: Int = 0,
+    val triggerMaxRetries: String = "5",
+    val triggerRetryDelay: String = "500"
+)
+
 /**
  * 메인 화면.
  * - 접근성 / 오버레이 권한
@@ -32,12 +54,22 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
  */
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        /** CoordPickerService 가 터치 좌표를 여기에 저장한 뒤 앱을 포그라운드로 올린다 */
+        @Volatile var pickedCoord: Triple<Int, Int, String>? = null
+        /** 피커가 취소되었을 때 true */
+        @Volatile var pickCancelled: Boolean = false
+    }
+
     private lateinit var binding: ActivityMainBinding
     private var isRunning = false
 
     private val points = mutableListOf<ClickPoint>()
     private lateinit var pointAdapter: PointListAdapter
     private lateinit var itemTouchHelper: ItemTouchHelper
+
+    /** 좌표 피커 실행 전 저장해 둔 다이얼로그 상태 (복귀 시 복원) */
+    private var pendingDialogState: PointDialogState? = null
 
     private val profileManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -91,11 +123,13 @@ class MainActivity : AppCompatActivity() {
         setupButtons()
         loadSequence()
         registerStatusReceiver()
+        showFirstRunGuideIfNeeded()
     }
 
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+        handlePickedCoord()
     }
 
     override fun onPause() {
@@ -108,6 +142,33 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         runCatching { unregisterReceiver(statusReceiver) }
     }
+
+    // ── 좌표 피커 결과 처리 ──────────────────────────────────────────────
+
+    private fun handlePickedCoord() {
+        when {
+            pickCancelled -> {
+                pickCancelled = false
+                pendingDialogState?.let { showAddPointDialog(it) }
+                pendingDialogState = null
+            }
+            pickedCoord != null -> {
+                val (x, y, target) = pickedCoord!!
+                pickedCoord = null
+                val base = pendingDialogState ?: PointDialogState()
+                pendingDialogState = null
+                val updated = when (target) {
+                    CoordPickerService.TARGET_START   -> base.copy(x = x.toString(), y = y.toString())
+                    CoordPickerService.TARGET_END     -> base.copy(endX = x.toString(), endY = y.toString())
+                    CoordPickerService.TARGET_TRIGGER -> base.copy(triggerX = x.toString(), triggerY = y.toString())
+                    else -> base
+                }
+                showAddPointDialog(updated)
+            }
+        }
+    }
+
+    // ── UI 설정 ─────────────────────────────────────────────────────────
 
     private fun setupPointList() {
         pointAdapter = PointListAdapter(
@@ -140,15 +201,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         binding.btnEnableAccessibility.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            MaterialAlertDialogBuilder(this)
+                .setTitle("접근성 서비스 활성화 방법")
+                .setMessage(
+                    "1. 아래 '설정 열기'를 누르세요\n\n" +
+                    "2. '설치된 앱' 또는 '다운로드된 앱'을 탭하세요\n\n" +
+                    "3. 목록에서 'AutoClicker 자동 클릭'을 찾아 탭하세요\n\n" +
+                    "4. 스위치를 켜고 '허용'을 누르세요\n\n" +
+                    "※ 설정 후 앱으로 돌아오면 자동 반영됩니다."
+                )
+                .setNegativeButton("취소", null)
+                .setPositiveButton("설정 열기") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+                .show()
         }
 
         binding.btnEnableOverlay.setOnClickListener {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("다른 앱 위에 표시 권한")
+                .setMessage(
+                    "플로팅 컨트롤 버튼을 화면 위에 띄우기 위한 권한입니다.\n\n" +
+                    "1. 아래 '설정 열기'를 누르세요\n\n" +
+                    "2. 'AutoClicker' 항목에서 스위치를 켜세요\n\n" +
+                    "3. 앱으로 돌아오면 자동 반영됩니다."
+                )
+                .setNegativeButton("취소", null)
+                .setPositiveButton("설정 열기") { _, _ ->
+                    startActivity(Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    ))
+                }
+                .show()
         }
 
         binding.btnAddPoint.setOnClickListener { showAddPointDialog() }
@@ -195,7 +280,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showAddPointDialog() {
+    // ── 포인트 추가 다이얼로그 ───────────────────────────────────────────
+
+    private fun showAddPointDialog(prefill: PointDialogState? = null) {
         if (points.size >= 50) {
             Toast.makeText(this, R.string.toast_max_points, Toast.LENGTH_SHORT).show()
             return
@@ -212,7 +299,6 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
-        applyGestureUi(0)
 
         dialogBinding.cbTrigger.setOnCheckedChangeListener { _, checked ->
             dialogBinding.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
@@ -224,7 +310,55 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
 
-        MaterialAlertDialogBuilder(this)
+        // 프리필 상태 적용
+        if (prefill != null) {
+            dialogBinding.etDialogX.setText(prefill.x)
+            dialogBinding.etDialogY.setText(prefill.y)
+            dialogBinding.etDialogEndX.setText(prefill.endX)
+            dialogBinding.etDialogEndY.setText(prefill.endY)
+            if (prefill.swipeDur.isNotEmpty()) dialogBinding.etDialogSwipeDur.setText(prefill.swipeDur)
+            if (prefill.longDur.isNotEmpty()) dialogBinding.etDialogLongDur.setText(prefill.longDur)
+            dialogBinding.etDialogLabel.setText(prefill.label)
+            dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
+            dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
+            dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
+            dialogBinding.etTriggerX.setText(prefill.triggerX)
+            dialogBinding.etTriggerY.setText(prefill.triggerY)
+            if (prefill.triggerColor.isNotEmpty()) dialogBinding.etTriggerColor.setText(prefill.triggerColor)
+            if (prefill.triggerTolerance.isNotEmpty()) dialogBinding.etTriggerTolerance.setText(prefill.triggerTolerance)
+            if (prefill.triggerMaxRetries.isNotEmpty()) dialogBinding.etTriggerMaxRetries.setText(prefill.triggerMaxRetries)
+            if (prefill.triggerRetryDelay.isNotEmpty()) dialogBinding.etTriggerRetryDelay.setText(prefill.triggerRetryDelay)
+            dialogBinding.spinnerGesture.setSelection(prefill.gesturePos)
+            dialogBinding.spinnerTriggerAction.setSelection(prefill.triggerActionPos)
+            applyGestureUi(prefill.gesturePos)
+            dialogBinding.groupTriggerRetry.visibility = if (prefill.triggerActionPos == 1) View.VISIBLE else View.GONE
+        } else {
+            applyGestureUi(0)
+        }
+
+        // 다이얼로그 참조 (피커 버튼에서 dismiss 용)
+        var dialog: AlertDialog? = null
+
+        fun launchPicker(target: String) {
+            pendingDialogState = captureDialogState(dialogBinding)
+            dialog?.dismiss()
+            dialog = null
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, target)
+            })
+        }
+
+        dialogBinding.btnPickStart.setOnClickListener {
+            launchPicker(CoordPickerService.TARGET_START)
+        }
+        dialogBinding.btnPickEnd.setOnClickListener {
+            launchPicker(CoordPickerService.TARGET_END)
+        }
+        dialogBinding.btnPickTrigger.setOnClickListener {
+            launchPicker(CoordPickerService.TARGET_TRIGGER)
+        }
+
+        dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.btn_add_point)
             .setView(dialogBinding.root)
             .setNegativeButton(android.R.string.cancel, null)
@@ -319,8 +453,33 @@ class MainActivity : AppCompatActivity() {
                 pointAdapter.notifyItemInserted(points.size - 1)
                 persistSequence()
             }
-            .show()
+            .show() as AlertDialog
+
+        return
     }
+
+    /** 현재 다이얼로그 입력 상태를 스냅샷으로 저장 */
+    private fun captureDialogState(d: DialogAddPointBinding) = PointDialogState(
+        gesturePos     = d.spinnerGesture.selectedItemPosition,
+        x              = d.etDialogX.text?.toString().orEmpty(),
+        y              = d.etDialogY.text?.toString().orEmpty(),
+        endX           = d.etDialogEndX.text?.toString().orEmpty(),
+        endY           = d.etDialogEndY.text?.toString().orEmpty(),
+        swipeDur       = d.etDialogSwipeDur.text?.toString().orEmpty(),
+        longDur        = d.etDialogLongDur.text?.toString().orEmpty(),
+        label          = d.etDialogLabel.text?.toString().orEmpty(),
+        delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
+        triggerEnabled = d.cbTrigger.isChecked,
+        triggerX       = d.etTriggerX.text?.toString().orEmpty(),
+        triggerY       = d.etTriggerY.text?.toString().orEmpty(),
+        triggerColor   = d.etTriggerColor.text?.toString().orEmpty(),
+        triggerTolerance  = d.etTriggerTolerance.text?.toString().orEmpty(),
+        triggerActionPos  = d.spinnerTriggerAction.selectedItemPosition,
+        triggerMaxRetries = d.etTriggerMaxRetries.text?.toString().orEmpty(),
+        triggerRetryDelay = d.etTriggerRetryDelay.text?.toString().orEmpty()
+    )
+
+    // ── 시퀀스 로드/저장 ────────────────────────────────────────────────
 
     private fun loadSequence() {
         val cfg = SequencePrefs.load(this)
@@ -411,6 +570,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    // ── 자동 클릭 시작/정지 ─────────────────────────────────────────────
+
     private fun startAutoClick(config: ClickSequenceConfig) {
         val json = config.toJsonString()
         val serviceIntent = Intent(this, OverlayService::class.java).apply {
@@ -444,6 +605,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    // ── 권한 상태 ────────────────────────────────────────────────────────
+
     private fun updatePermissionStatus() {
         val a11yOn = isAccessibilityEnabled()
         binding.tvAccessibilityStatus.text = getString(
@@ -462,6 +625,30 @@ class MainActivity : AppCompatActivity() {
             getColor(if (overlayOn) android.R.color.holo_green_light else android.R.color.holo_orange_light)
         )
         binding.btnEnableOverlay.isEnabled = !overlayOn
+    }
+
+    // ── 첫 실행 가이드 ───────────────────────────────────────────────────
+
+    private fun showFirstRunGuideIfNeeded() {
+        val prefs = getSharedPreferences("main_prefs", MODE_PRIVATE)
+        if (prefs.getBoolean("first_run_done", false)) return
+        prefs.edit().putBoolean("first_run_done", true).apply()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("AutoClicker 시작 가이드")
+            .setMessage(
+                "사용 전 두 가지 권한이 필요합니다.\n\n" +
+                "① 접근성 서비스\n" +
+                "   화면 자동 터치를 위한 핵심 권한\n" +
+                "   → '접근성 권한 설정' 버튼 → 설치된 앱\n" +
+                "   → 'AutoClicker 자동 클릭' → 스위치 ON\n\n" +
+                "② 다른 앱 위에 표시\n" +
+                "   플로팅 버튼 표시를 위한 권한\n" +
+                "   → '오버레이 권한 설정' 버튼 → 스위치 ON\n\n" +
+                "두 권한 모두 허용 후 포인트를 추가하고\n'시작' 버튼을 누르면 자동 클릭이 시작됩니다."
+            )
+            .setPositiveButton("확인했습니다", null)
+            .show()
     }
 
     private fun isAccessibilityEnabled(): Boolean {

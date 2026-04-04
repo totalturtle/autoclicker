@@ -64,6 +64,11 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <!-- 좌표 피커 오버레이 서비스 -->
+        <service
+            android:name=".CoordPickerService"
+            android:exported="false" />
+
         <!-- 빠른 설정 타일 -->
         <service
             android:name=".AutoClickTileService"

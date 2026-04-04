@@ -129,4 +129,10 @@
     <string name="status_accessibility_on">✓ 접근성 서비스 활성화됨</string>
     <string name="status_overlay_off">⚠ 오버레이 권한이 없습니다</string>
     <string name="status_overlay_on">✓ 오버레이 권한 허용됨</string>
+
+    <!-- 좌표 피커 -->
+    <string name="coord_picker_instruction">화면을 터치하여 좌표를 선택하세요\n(취소하려면 취소 버튼을 누르세요)</string>
+    <string name="btn_pick_start">터치로 시작 좌표 선택</string>
+    <string name="btn_pick_end">터치로 끝 좌표 선택</string>
+    <string name="btn_pick_trigger">터치로 트리거 좌표 선택</string>
 </resources>
