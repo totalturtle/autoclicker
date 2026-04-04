@@ -134,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         updatePermissionStatus()
         handlePickedCoord()
         if (!isRunning) startCoordOverlay()
+        ensureOverlayServiceRunning()
     }
 
     override fun onPause() {
@@ -171,6 +172,16 @@ class MainActivity : AppCompatActivity() {
                 showAddPointDialog(updated)
             }
         }
+    }
+
+    // ── OverlayService 항상 실행 ─────────────────────────────────────────
+
+    private fun ensureOverlayServiceRunning() {
+        if (!Settings.canDrawOverlays(this)) return
+        val json = readRawConfig().toJsonString()
+        startForegroundService(Intent(this, OverlayService::class.java).apply {
+            putExtra(OverlayService.EXTRA_SEQUENCE_JSON, json)
+        })
     }
 
     // ── 좌표 시각화 오버레이 ─────────────────────────────────────────────
@@ -611,16 +622,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun startAutoClick(config: ClickSequenceConfig) {
         val json = config.toJsonString()
-        val serviceIntent = Intent(this, OverlayService::class.java).apply {
+        // OverlayService는 이미 실행 중 — JSON만 업데이트
+        startForegroundService(Intent(this, OverlayService::class.java).apply {
             putExtra(OverlayService.EXTRA_SEQUENCE_JSON, json)
-        }
-        startForegroundService(serviceIntent)
-
+        })
         sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
             setPackage(packageName)
             putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
         })
-
         binding.tvStatus.text = getString(R.string.status_running)
         binding.tvClickCount.text = getString(R.string.click_count_fmt, 0)
     }
@@ -629,7 +638,7 @@ class MainActivity : AppCompatActivity() {
         sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply {
             setPackage(packageName)
         })
-        stopService(Intent(this, OverlayService::class.java))
+        // OverlayService는 계속 유지 (패널/마커 표시 지속)
         binding.tvStatus.text = getString(R.string.status_idle)
     }
 
@@ -693,7 +702,13 @@ class MainActivity : AppCompatActivity() {
     private fun isAccessibilityEnabled(): Boolean {
         val am = getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager
         val services = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        return services.any { it.resolveInfo.serviceInfo.packageName == packageName }
+        // debug 빌드는 패키지명이 com.autoclicker.debug 이지만
+        // 접근성 서비스는 namespace(com.autoclicker) 기준으로 등록되므로 양쪽 체크
+        val basePackage = packageName.removeSuffix(".debug")
+        return services.any { info ->
+            val pkg = info.resolveInfo.serviceInfo.packageName
+            pkg == packageName || pkg == basePackage || info.id.startsWith(basePackage)
+        }
     }
 
     private fun registerStatusReceiver() {

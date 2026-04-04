@@ -16,16 +16,26 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * 화면에서 좌표를 직접 탭하여 선택할 수 있는 전체화면 투명 오버레이 서비스.
- * 탭 좌표를 MainActivity.pickedCoord 에 저장한 뒤 앱을 포그라운드로 복귀시킨다.
+ * 화면을 터치하여 좌표를 선택하는 전체화면 투명 오버레이 서비스.
+ *
+ * - TARGET_START / TARGET_END / TARGET_TRIGGER : MainActivity 다이얼로그 복원용
+ *   → pickedCoord 에 저장 후 앱 포그라운드 복귀
+ * - TARGET_OVERLAY_ADD : OverlayService에서 빠른 포인트 추가용
+ *   → ACTION_OVERLAY_COORD_PICKED 브로드캐스트 전송 (앱 복귀 없음)
  */
 class CoordPickerService : Service() {
 
     companion object {
         const val EXTRA_PICK_TARGET = "pick_target"
-        const val TARGET_START   = "start"   // 시작 X, Y
-        const val TARGET_END     = "end"     // 스와이프 끝 X, Y
-        const val TARGET_TRIGGER = "trigger" // 트리거 확인 X, Y
+        const val TARGET_START       = "start"
+        const val TARGET_END         = "end"
+        const val TARGET_TRIGGER     = "trigger"
+        const val TARGET_OVERLAY_ADD = "overlay_add"
+
+        /** OverlayService 가 수신하는 브로드캐스트 */
+        const val ACTION_OVERLAY_COORD_PICKED = "com.autoclicker.OVERLAY_COORD_PICKED"
+        const val EXTRA_PICKED_X = "picked_x"
+        const val EXTRA_PICKED_Y = "picked_y"
     }
 
     private lateinit var wm: WindowManager
@@ -44,7 +54,13 @@ class CoordPickerService : Service() {
 
         val rootView = FrameLayout(this)
 
-        // 반투명 전체화면 터치 캡처 레이어
+        val instructionText = when (target) {
+            TARGET_OVERLAY_ADD -> "클릭할 위치를 터치하세요\n(포인트로 즉시 추가됩니다)"
+            TARGET_END         -> "스와이프 끝 좌표를 터치하세요"
+            TARGET_TRIGGER     -> "트리거 확인 좌표를 터치하세요"
+            else               -> getString(R.string.coord_picker_instruction)
+        }
+
         val touchLayer = View(this).apply {
             setBackgroundColor(0x33000000)
             isClickable = true
@@ -56,18 +72,17 @@ class CoordPickerService : Service() {
             }
         }
 
-        // 상단 안내 배너 (터치 흡수하여 좌표 전달 방지)
         val banner = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xDD1A237E.toInt())
+            setBackgroundColor(0xDD0D1117.toInt())
             isClickable = true
             setPadding(dp(16), dp(48), dp(16), dp(16))
         }
 
         banner.addView(TextView(this).apply {
-            text = getString(R.string.coord_picker_instruction)
+            text = instructionText
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 17f
             gravity = Gravity.CENTER
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -75,8 +90,8 @@ class CoordPickerService : Service() {
         ))
 
         banner.addView(Button(this).apply {
-            text = getString(android.R.string.cancel)
-            setOnClickListener { cancel() }
+            text = "취소"
+            setOnClickListener { cancel(target) }
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -108,15 +123,34 @@ class CoordPickerService : Service() {
     }
 
     private fun deliver(x: Int, y: Int, target: String) {
-        MainActivity.pickedCoord = Triple(x, y, target)
-        bringAppToFront()
+        dismiss()
+        if (target == TARGET_OVERLAY_ADD) {
+            // 오버레이에서 빠른 추가 — 앱 복귀 없이 브로드캐스트만
+            sendBroadcast(Intent(ACTION_OVERLAY_COORD_PICKED).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_PICKED_X, x)
+                putExtra(EXTRA_PICKED_Y, y)
+            })
+        } else {
+            // 메인 다이얼로그 복원용
+            MainActivity.pickedCoord = Triple(x, y, target)
+            bringAppToFront()
+        }
         stopSelf()
     }
 
-    private fun cancel() {
-        MainActivity.pickCancelled = true
-        bringAppToFront()
+    private fun cancel(target: String) {
+        dismiss()
+        if (target != TARGET_OVERLAY_ADD) {
+            MainActivity.pickCancelled = true
+            bringAppToFront()
+        }
         stopSelf()
+    }
+
+    private fun dismiss() {
+        root?.let { runCatching { wm.removeView(it) } }
+        root = null
     }
 
     private fun bringAppToFront() {
@@ -132,6 +166,6 @@ class CoordPickerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        root?.let { runCatching { wm.removeView(it) } }
+        dismiss()
     }
 }

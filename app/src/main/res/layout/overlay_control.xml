@@ -1,29 +1,87 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 플로팅 오버레이 패널 레이아웃 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
+    android:layout_width="52dp"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/overlay_bg"
-    android:padding="8dp"
-    android:gravity="center">
+    android:background="@drawable/bg_overlay_panel"
+    android:gravity="center_horizontal">
 
+    <!-- 드래그 핸들 -->
+    <TextView
+        android:id="@+id/overlayDragHandle"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:gravity="center"
+        android:text="· · ·"
+        android:textColor="#484F58"
+        android:textSize="11sp" />
+
+    <!-- 설정 (앱 열기) -->
+    <ImageButton
+        android:id="@+id/btnOverlaySettings"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_settings"
+        android:tint="#8B949E"
+        android:contentDescription="설정" />
+
+    <View
+        android:layout_width="32dp"
+        android:layout_height="1dp"
+        android:background="#21262D" />
+
+    <!-- 포인트 추가 -->
+    <ImageButton
+        android:id="@+id/btnOverlayAddPoint"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_add"
+        android:tint="#6366F1"
+        android:contentDescription="포인트 추가" />
+
+    <!-- 포인트 삭제 -->
+    <ImageButton
+        android:id="@+id/btnOverlayRemovePoint"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_remove"
+        android:tint="#8B949E"
+        android:contentDescription="마지막 포인트 삭제" />
+
+    <View
+        android:layout_width="32dp"
+        android:layout_height="1dp"
+        android:background="#21262D" />
+
+    <!-- 시작/정지 -->
+    <Button
+        android:id="@+id/btnOverlayToggle"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:text="▶"
+        android:textSize="18sp"
+        android:textColor="#3FB950"
+        android:background="@android:color/transparent"
+        android:padding="0dp"
+        android:stateListAnimator="@null" />
+
+    <View
+        android:layout_width="32dp"
+        android:layout_height="1dp"
+        android:background="#21262D" />
+
+    <!-- 클릭 횟수 -->
     <TextView
         android:id="@+id/tvOverlayStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="대기"
-        android:textColor="#FFFFFF"
+        android:text="0"
+        android:textColor="#8B949E"
         android:textSize="11sp"
-        android:layout_marginBottom="4dp" />
-
-    <Button
-        android:id="@+id/btnOverlayToggle"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:text="▶"
-        android:textSize="20sp"
-        android:backgroundTint="@color/btn_start"
-        android:padding="0dp" />
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp" />
 
 </LinearLayout>
