@@ -1,4 +1,5 @@
 <resources>
+    <!-- Legacy (used in older code) -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -7,6 +8,22 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="overlay_bg">#CC000000</color>
-    <color name="btn_start">#FF4CAF50</color>
-    <color name="btn_stop">#FFF44336</color>
+
+    <!-- New design palette -->
+    <color name="bg_dark">#0D1117</color>
+    <color name="surface">#161B22</color>
+    <color name="surface_2">#1C2333</color>
+    <color name="divider">#21262D</color>
+    <color name="primary">#6366F1</color>
+    <color name="primary_dark">#4F46E5</color>
+    <color name="text_primary">#E6EDF3</color>
+    <color name="text_secondary">#8B949E</color>
+    <color name="text_hint">#484F58</color>
+    <color name="btn_start">#238636</color>
+    <color name="btn_start_text">#3FB950</color>
+    <color name="btn_stop">#DA3633</color>
+    <color name="btn_stop_text">#F85149</color>
+    <color name="status_running">#3FB950</color>
+    <color name="status_idle">#8B949E</color>
+    <color name="perm_warn">#D29922</color>
 </resources>

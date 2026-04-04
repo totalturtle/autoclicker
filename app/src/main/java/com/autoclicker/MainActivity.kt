@@ -71,6 +71,9 @@ class MainActivity : AppCompatActivity() {
     /** 좌표 피커 실행 전 저장해 둔 다이얼로그 상태 (복귀 시 복원) */
     private var pendingDialogState: PointDialogState? = null
 
+    /** 좌표 시각화 오버레이 현재 활성 여부 */
+    private var coordOverlayRunning = false
+
     private val profileManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -130,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionStatus()
         handlePickedCoord()
+        if (!isRunning) startCoordOverlay()
     }
 
     override fun onPause() {
@@ -141,6 +145,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         runCatching { unregisterReceiver(statusReceiver) }
+        stopCoordOverlay()
     }
 
     // ── 좌표 피커 결과 처리 ──────────────────────────────────────────────
@@ -166,6 +171,31 @@ class MainActivity : AppCompatActivity() {
                 showAddPointDialog(updated)
             }
         }
+    }
+
+    // ── 좌표 시각화 오버레이 ─────────────────────────────────────────────
+
+    private fun startCoordOverlay() {
+        if (!Settings.canDrawOverlays(this)) return
+        val json = readRawConfig().toJsonString()
+        startService(Intent(this, CoordOverlayService::class.java).apply {
+            putExtra(CoordOverlayService.EXTRA_POINTS_JSON, json)
+        })
+        coordOverlayRunning = true
+    }
+
+    private fun stopCoordOverlay() {
+        stopService(Intent(this, CoordOverlayService::class.java))
+        coordOverlayRunning = false
+    }
+
+    private fun sendCoordOverlayUpdate() {
+        if (!coordOverlayRunning) return
+        val json = readRawConfig().toJsonString()
+        sendBroadcast(Intent(CoordOverlayService.ACTION_UPDATE).apply {
+            setPackage(packageName)
+            putExtra(CoordOverlayService.EXTRA_POINTS_JSON, json)
+        })
     }
 
     // ── UI 설정 ─────────────────────────────────────────────────────────
@@ -256,6 +286,12 @@ class MainActivity : AppCompatActivity() {
 
         binding.switchVolumeHotkey.setOnCheckedChangeListener { _, checked ->
             SequencePrefs.setVolumeHotkeyEnabled(this, checked)
+        }
+
+        binding.btnToggleOverlay.setOnClickListener {
+            sendBroadcast(Intent(CoordOverlayService.ACTION_TOGGLE).apply {
+                setPackage(packageName)
+            })
         }
 
         binding.btnStart.setOnClickListener {
@@ -502,6 +538,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun persistSequence() {
         SequencePrefs.save(this, readRawConfig())
+        sendCoordOverlayUpdate()
     }
 
     private fun buildConfig(): ClickSequenceConfig? {
@@ -603,6 +640,8 @@ class MainActivity : AppCompatActivity() {
         binding.tvStatus.text = getString(
             if (running) R.string.status_running else R.string.status_idle
         )
+        // 자동 클릭 실행 중엔 시각화 오버레이 숨김
+        if (running) stopCoordOverlay() else startCoordOverlay()
     }
 
     // ── 권한 상태 ────────────────────────────────────────────────────────
