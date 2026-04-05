@@ -70,7 +70,9 @@
             android:name=".PointSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.AutoClicker.TransparentDialog"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:excludeFromRecents="true" />
 
         <!-- 좌표 피커 오버레이 서비스 -->
         <service
