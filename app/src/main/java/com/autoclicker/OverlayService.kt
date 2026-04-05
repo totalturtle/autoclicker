@@ -22,6 +22,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.view.isVisible
 
 /**
  * 항상 화면 위에 떠 있는 플로팅 컨트롤 패널 + 드래그 가능한 포인트 마커.
@@ -47,6 +48,7 @@ class OverlayService : Service() {
     private lateinit var panelParams:   WindowManager.LayoutParams
 
     private var isRunning    = false
+    private var isEditMode   = false
     private var sequenceJson: String? = null
 
     /** 드래그 가능한 마커 목록 */
@@ -148,6 +150,10 @@ class OverlayService : Service() {
             })
         }
 
+        overlayView.findViewById<Button>(R.id.btnOverlayEditMode).setOnClickListener {
+            setEditMode(!isEditMode)
+        }
+
         overlayView.findViewById<ImageButton>(R.id.btnOverlayAddPoint).setOnClickListener {
             addNewPoint()
         }
@@ -169,6 +175,38 @@ class OverlayService : Service() {
                 setRunningState(true)
             }
         }
+    }
+
+    private fun setEditMode(edit: Boolean) {
+        isEditMode = edit
+        val btn = overlayView.findViewById<Button>(R.id.btnOverlayEditMode)
+        val addBtn = overlayView.findViewById<ImageButton>(R.id.btnOverlayAddPoint)
+        val removeBtn = overlayView.findViewById<ImageButton>(R.id.btnOverlayRemovePoint)
+        if (edit) {
+            btn.text = "편집중"
+            btn.setTextColor(0xFF6366F1.toInt())
+            btn.setBackgroundResource(R.drawable.bg_edit_mode_on)
+            addBtn.isVisible = true
+            removeBtn.isVisible = true
+        } else {
+            btn.text = "편집"
+            btn.setTextColor(0xFF8B949E.toInt())
+            btn.setBackgroundResource(R.drawable.bg_edit_mode_off)
+            addBtn.isVisible = false
+            removeBtn.isVisible = false
+        }
+        // 모든 마커의 터치 통과 여부 업데이트
+        markers.forEach { updateMarkerTouchable(it) }
+    }
+
+    private fun updateMarkerTouchable(entry: MarkerEntry) {
+        val flag = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (isEditMode) {
+            entry.params.flags = entry.params.flags and flag.inv()
+        } else {
+            entry.params.flags = entry.params.flags or flag
+        }
+        runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
     }
 
     private fun setRunningState(running: Boolean) {
@@ -249,6 +287,9 @@ class OverlayService : Service() {
     private fun addMarkerView(index: Int, x: Int, y: Int) {
         val view = MarkerDotView(this, index + 1)
 
+        // 기본: 편집 모드 아니면 터치 통과 (FLAG_NOT_TOUCHABLE)
+        val touchFlag = if (isEditMode) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+
         val params = WindowManager.LayoutParams(
             markerSizePx, markerSizePx,
             x - markerSizePx / 2,
@@ -256,12 +297,14 @@ class OverlayService : Service() {
             overlayType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    touchFlag,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
 
         runCatching { windowManager.addView(view, params) }
-        markers.add(MarkerEntry(view, params))
+        val entry = MarkerEntry(view, params)
+        markers.add(entry)
 
         setupMarkerTouch(view, params, index)
     }
