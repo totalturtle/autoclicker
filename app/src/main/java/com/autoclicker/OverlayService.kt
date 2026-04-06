@@ -44,6 +44,7 @@ class OverlayService : Service() {
 
     companion object {
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
+        const val ACTION_TOGGLE_MARKERS = "com.autoclicker.OVERLAY_TOGGLE_MARKERS"
         private const val CHANNEL_ID  = "overlay_channel"
         private const val NOTIF_ID    = 1001
     }
@@ -52,9 +53,10 @@ class OverlayService : Service() {
     private lateinit var overlayView:   View
     private lateinit var panelParams:   WindowManager.LayoutParams
 
-    private var isRunning    = false
-    private var isEditMode   = false
+    private var isRunning       = false
+    private var isEditMode      = false
     private var sequenceJson: String? = null
+    private var markersVisible  = true
 
     /** 드래그 가능한 마커 목록 */
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
@@ -71,14 +73,14 @@ class OverlayService : Service() {
                     val count = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_COUNT, 0)
                     overlayView.findViewById<TextView>(R.id.tvOverlayStatus)?.text = count.toString()
                 }
+                AutoClickAccessibilityService.ACTION_STARTED -> setRunningState(true)
                 AutoClickAccessibilityService.ACTION_STOP -> setRunningState(false)
-
                 AutoClickAccessibilityService.ACTION_AUTO_PROFILE -> {
                     sequenceJson = SequencePrefs.load(this@OverlayService)?.toJsonString() ?: sequenceJson
                     refreshMarkers()
                 }
-
                 PointSettingsActivity.ACTION_POINT_UPDATED -> refreshMarkers()
+                ACTION_TOGGLE_MARKERS -> setMarkersVisible(!markersVisible)
             }
         }
     }
@@ -96,9 +98,11 @@ class OverlayService : Service() {
 
         val filter = IntentFilter().apply {
             addAction(AutoClickAccessibilityService.ACTION_CLICK_COUNT)
+            addAction(AutoClickAccessibilityService.ACTION_STARTED)
             addAction(AutoClickAccessibilityService.ACTION_STOP)
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
+            addAction(ACTION_TOGGLE_MARKERS)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
@@ -167,15 +171,17 @@ class OverlayService : Service() {
         overlayView.findViewById<Button>(R.id.btnOverlayToggle).setOnClickListener {
             if (isRunning) {
                 sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
-                setRunningState(false)
             } else {
                 val json = sequenceJson ?: SequencePrefs.load(this)?.toJsonString() ?: return@setOnClickListener
                 sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
                     setPackage(packageName)
                     putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
                 })
-                setRunningState(true)
             }
+        }
+
+        overlayView.findViewById<ImageButton>(R.id.btnOverlayToggleMarkers).setOnClickListener {
+            setMarkersVisible(!markersVisible)
         }
     }
 
@@ -218,6 +224,17 @@ class OverlayService : Service() {
             setTextColor(if (running) 0xFFF85149.toInt() else 0xFF3FB950.toInt())
         }
         if (!running) overlayView.findViewById<TextView>(R.id.tvOverlayStatus)?.text = "0"
+        // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
+        val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
+        markers.forEach { it.view.visibility = v }
+    }
+
+    private fun setMarkersVisible(visible: Boolean) {
+        markersVisible = visible
+        val v = if (markersVisible && !isRunning) View.VISIBLE else View.INVISIBLE
+        markers.forEach { it.view.visibility = v }
+        overlayView.findViewById<ImageButton>(R.id.btnOverlayToggleMarkers)?.alpha =
+            if (markersVisible) 1f else 0.4f
     }
 
     private fun setupPanelDrag() {
@@ -243,17 +260,20 @@ class OverlayService : Service() {
     // ── 마커 관리 ───────────────────────────────────────────────────────
 
     private fun loadMarkersFromPrefs() {
-        val cfg = SequencePrefs.load(this) ?: return
-        sequenceJson = cfg.toJsonString()
+        sequenceJson = SequencePrefs.loadRawJson(this)
+        val cfg = ClickSequenceConfig.fromJsonString(sequenceJson) ?: return
         clearMarkers()
         cfg.points.forEachIndexed { idx, pt -> addMarkerView(idx, pt.x, pt.y) }
     }
 
     private fun refreshMarkers() {
-        val cfg = SequencePrefs.load(this)
-        sequenceJson = cfg?.toJsonString()
+        sequenceJson = SequencePrefs.loadRawJson(this)
+        val cfg = ClickSequenceConfig.fromJsonString(sequenceJson)
         clearMarkers()
         cfg?.points?.forEachIndexed { idx, pt -> addMarkerView(idx, pt.x, pt.y) }
+        if (!markersVisible || isRunning) {
+            markers.forEach { it.view.visibility = View.INVISIBLE }
+        }
     }
 
     private fun addNewPoint() {
@@ -365,6 +385,7 @@ class OverlayService : Service() {
         d.etDialogY.setText(point.y.toString())
         d.etDialogLabel.setText(point.label)
         if (point.delayAfterMs >= 0) d.etDialogDelayAfter.setText(point.delayAfterMs.toString())
+        if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
 
         val gesturePos = when (point.gesture) {
             GestureType.LONG_PRESS -> 1
@@ -436,6 +457,7 @@ class OverlayService : Service() {
         val y = d.etDialogY.text?.toString()?.toIntOrNull() ?: original.y
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
         val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
+        val variance = d.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
 
         var endX = x; var endY = y
         var longMs = original.longPressDurationMs
@@ -478,7 +500,7 @@ class OverlayService : Service() {
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
-            trigger = newTrigger
+            trigger = newTrigger, randomVarianceMs = variance
         )
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
         SequencePrefs.save(this, cfg.copy(points = newPoints))

@@ -15,7 +15,8 @@ data class ClickPoint(
     val endY: Int = y,
     val longPressDurationMs: Long = 450L,
     val swipeDurationMs: Long = 350L,
-    val trigger: TriggerCondition? = null
+    val trigger: TriggerCondition? = null,
+    val randomVarianceMs: Long = 0L
 )
 
 /**
@@ -25,18 +26,14 @@ data class ClickPoint(
 data class ClickSequenceConfig(
     val points: List<ClickPoint>,
     val globalDelayMs: Long,
-    val repeatCount: Int,
-    val randomDelayMinMs: Long = 0L,
-    val randomDelayMaxMs: Long = 0L
+    val repeatCount: Int
 ) {
-    private val useRandom: Boolean
-        get() = randomDelayMinMs > 0L && randomDelayMaxMs > randomDelayMinMs
-
     fun delayAfter(point: ClickPoint): Long {
-        if (useRandom) {
-            return randomDelayMinMs + ((Math.random() * (randomDelayMaxMs - randomDelayMinMs)).toLong())
-        }
-        return if (point.delayAfterMs >= 0) point.delayAfterMs else globalDelayMs
+        val base = if (point.delayAfterMs >= 0) point.delayAfterMs else globalDelayMs
+        val variance = point.randomVarianceMs
+        if (variance <= 0) return base
+        val offset = ((Math.random() * variance * 2) - variance).toLong()
+        return (base + offset).coerceAtLeast(0L)
     }
 
     fun toJsonString(): String {
@@ -68,6 +65,7 @@ data class ClickSequenceConfig(
                             put("rDelay", p.trigger.retryDelayMs)
                         })
                     }
+                    if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
                 }
             )
         }
@@ -75,8 +73,6 @@ data class ClickSequenceConfig(
             put("points", arr)
             put("globalDelay", globalDelayMs)
             put("repeat", repeatCount)
-            put("randomMin", randomDelayMinMs)
-            put("randomMax", randomDelayMaxMs)
         }.toString()
     }
 
@@ -115,7 +111,8 @@ data class ClickSequenceConfig(
                                 endY = if (o.has("ey")) o.getInt("ey") else y,
                                 longPressDurationMs = o.optLong("ld", 450L).coerceIn(100L, 60_000L),
                                 swipeDurationMs = o.optLong("sd", 350L).coerceIn(50L, 60_000L),
-                                trigger = trigger
+                                trigger = trigger,
+                                randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L)
                             )
                         )
                     }
@@ -123,9 +120,7 @@ data class ClickSequenceConfig(
                 ClickSequenceConfig(
                     points = list,
                     globalDelayMs = root.optLong("globalDelay", 1000L).coerceAtLeast(100L),
-                    repeatCount = root.optInt("repeat", 0).coerceAtLeast(0),
-                    randomDelayMinMs = root.optLong("randomMin", 0L).coerceAtLeast(0L),
-                    randomDelayMaxMs = root.optLong("randomMax", 0L).coerceAtLeast(0L)
+                    repeatCount = root.optInt("repeat", 0).coerceAtLeast(0)
                 )
             }.getOrNull()
         }
@@ -137,10 +132,11 @@ object SequencePrefs {
     private const val KEY_CONFIG = "config_json"
     private const val KEY_VOLUME_HOTKEY = "volume_hotkey"
 
+    fun loadRawJson(context: Context): String? =
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString(KEY_CONFIG, null)
+
     fun load(context: Context): ClickSequenceConfig? =
-        ClickSequenceConfig.fromJsonString(
-            context.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString(KEY_CONFIG, null)
-        )
+        ClickSequenceConfig.fromJsonString(loadRawJson(context))
 
     fun save(context: Context, config: ClickSequenceConfig) {
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()

@@ -234,7 +234,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
             )
         }
 
-    private fun dispatchStroke(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long) {
+    private suspend fun dispatchStroke(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long) {
         val path = Path().apply {
             moveTo(x1.toFloat(), y1.toFloat())
             lineTo(x2.toFloat(), y2.toFloat())
@@ -244,7 +244,17 @@ class AutoClickAccessibilityService : AccessibilityService() {
         val gesture = GestureDescription.Builder()
             .addStroke(stroke)
             .build()
-        dispatchGesture(gesture, null, null)
+        suspendCancellableCoroutine<Unit> { cont ->
+            val dispatched = dispatchGesture(gesture, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription) {
+                    if (cont.isActive) cont.resume(Unit)
+                }
+                override fun onCancelled(gestureDescription: GestureDescription) {
+                    if (cont.isActive) cont.resume(Unit)
+                }
+            }, null)
+            if (!dispatched && cont.isActive) cont.resume(Unit)
+        }
     }
 
     private fun broadcastStarted() {

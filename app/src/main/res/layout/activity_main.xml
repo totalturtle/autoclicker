@@ -273,45 +273,6 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- 랜덤 딜레이 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="14dp">
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:hint="랜덤 최소 ms"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etRandomMin"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:text="0"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:hint="랜덤 최대 ms"
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etRandomMax"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:text="0"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-                </LinearLayout>
-
                 <!-- 볼륨 토글 -->
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchVolumeHotkey"

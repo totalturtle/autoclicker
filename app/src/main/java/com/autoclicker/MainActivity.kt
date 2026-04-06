@@ -36,6 +36,7 @@ data class PointDialogState(
     val longDur: String = "450",
     val label: String = "",
     val delayAfter: String = "",
+    val variance: String = "",
     val triggerEnabled: Boolean = false,
     val triggerX: String = "",
     val triggerY: String = "",
@@ -70,9 +71,6 @@ class MainActivity : AppCompatActivity() {
 
     /** 좌표 피커 실행 전 저장해 둔 다이얼로그 상태 (복귀 시 복원) */
     private var pendingDialogState: PointDialogState? = null
-
-    /** 좌표 시각화 오버레이 현재 활성 여부 */
-    private var coordOverlayRunning = false
 
     private val profileManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -133,7 +131,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionStatus()
         handlePickedCoord()
-        if (!isRunning) startCoordOverlay()
+        syncPointsFromPrefs()
         ensureOverlayServiceRunning()
     }
 
@@ -146,7 +144,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         runCatching { unregisterReceiver(statusReceiver) }
-        stopCoordOverlay()
     }
 
     // ── 좌표 피커 결과 처리 ──────────────────────────────────────────────
@@ -174,6 +171,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── SequencePrefs → points 동기화 (OverlayService에서 변경된 내용 반영) ──
+
+    private fun syncPointsFromPrefs() {
+        val cfg = SequencePrefs.load(this) ?: return
+        if (cfg.points == points) return  // 변경 없으면 스킵
+        points.clear()
+        points.addAll(cfg.points)
+        pointAdapter.notifyDataSetChanged()
+    }
+
     // ── OverlayService 항상 실행 ─────────────────────────────────────────
 
     private fun ensureOverlayServiceRunning() {
@@ -181,31 +188,6 @@ class MainActivity : AppCompatActivity() {
         val json = readRawConfig().toJsonString()
         startForegroundService(Intent(this, OverlayService::class.java).apply {
             putExtra(OverlayService.EXTRA_SEQUENCE_JSON, json)
-        })
-    }
-
-    // ── 좌표 시각화 오버레이 ─────────────────────────────────────────────
-
-    private fun startCoordOverlay() {
-        if (!Settings.canDrawOverlays(this)) return
-        val json = readRawConfig().toJsonString()
-        startService(Intent(this, CoordOverlayService::class.java).apply {
-            putExtra(CoordOverlayService.EXTRA_POINTS_JSON, json)
-        })
-        coordOverlayRunning = true
-    }
-
-    private fun stopCoordOverlay() {
-        stopService(Intent(this, CoordOverlayService::class.java))
-        coordOverlayRunning = false
-    }
-
-    private fun sendCoordOverlayUpdate() {
-        if (!coordOverlayRunning) return
-        val json = readRawConfig().toJsonString()
-        sendBroadcast(Intent(CoordOverlayService.ACTION_UPDATE).apply {
-            setPackage(packageName)
-            putExtra(CoordOverlayService.EXTRA_POINTS_JSON, json)
         })
     }
 
@@ -300,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnToggleOverlay.setOnClickListener {
-            sendBroadcast(Intent(CoordOverlayService.ACTION_TOGGLE).apply {
+            sendBroadcast(Intent(OverlayService.ACTION_TOGGLE_MARKERS).apply {
                 setPackage(packageName)
             })
         }
@@ -367,6 +349,7 @@ class MainActivity : AppCompatActivity() {
             if (prefill.longDur.isNotEmpty()) dialogBinding.etDialogLongDur.setText(prefill.longDur)
             dialogBinding.etDialogLabel.setText(prefill.label)
             dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
+            dialogBinding.etDialogVariance.setText(prefill.variance)
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
             dialogBinding.etTriggerX.setText(prefill.triggerX)
@@ -419,8 +402,8 @@ class MainActivity : AppCompatActivity() {
                 val x = dialogBinding.etDialogX.text?.toString()?.toIntOrNull()
                 val y = dialogBinding.etDialogY.text?.toString()?.toIntOrNull()
                 val label = dialogBinding.etDialogLabel.text?.toString()?.trim().orEmpty()
-                val delayRaw = dialogBinding.etDialogDelayAfter.text?.toString()?.trim().orEmpty()
-                val delayAfter = delayRaw.toLongOrNull() ?: -1L
+                val delayAfter = dialogBinding.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
+                val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
 
                 if (x == null || y == null) {
                     Toast.makeText(this, "X, Y 좌표를 입력하세요.", Toast.LENGTH_SHORT).show()
@@ -494,7 +477,8 @@ class MainActivity : AppCompatActivity() {
                         endY = endY,
                         longPressDurationMs = longMs,
                         swipeDurationMs = swipeMs,
-                        trigger = trigger
+                        trigger = trigger,
+                        randomVarianceMs = variance
                     )
                 )
                 pointAdapter.notifyItemInserted(points.size - 1)
@@ -516,6 +500,7 @@ class MainActivity : AppCompatActivity() {
         longDur        = d.etDialogLongDur.text?.toString().orEmpty(),
         label          = d.etDialogLabel.text?.toString().orEmpty(),
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
+        variance       = d.etDialogVariance.text?.toString().orEmpty(),
         triggerEnabled = d.cbTrigger.isChecked,
         triggerX       = d.etTriggerX.text?.toString().orEmpty(),
         triggerY       = d.etTriggerY.text?.toString().orEmpty(),
@@ -535,13 +520,9 @@ class MainActivity : AppCompatActivity() {
             points.addAll(cfg.points)
             binding.etDelay.setText(cfg.globalDelayMs.toString())
             binding.etRepeat.setText(cfg.repeatCount.toString())
-            binding.etRandomMin.setText(cfg.randomDelayMinMs.toString())
-            binding.etRandomMax.setText(cfg.randomDelayMaxMs.toString())
         } else {
             binding.etDelay.setText("1000")
             binding.etRepeat.setText("0")
-            binding.etRandomMin.setText("0")
-            binding.etRandomMax.setText("0")
         }
         binding.switchVolumeHotkey.isChecked = SequencePrefs.isVolumeHotkeyEnabled(this)
         pointAdapter.notifyDataSetChanged()
@@ -549,7 +530,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun persistSequence() {
         SequencePrefs.save(this, readRawConfig())
-        sendCoordOverlayUpdate()
     }
 
     private fun buildConfig(): ClickSequenceConfig? {
@@ -560,14 +540,10 @@ class MainActivity : AppCompatActivity() {
     private fun readRawConfig(): ClickSequenceConfig {
         val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
         val repeat = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
-        val rMin = binding.etRandomMin.text?.toString()?.toLongOrNull() ?: 0L
-        val rMax = binding.etRandomMax.text?.toString()?.toLongOrNull() ?: 0L
         return ClickSequenceConfig(
             points = points.toList(),
             globalDelayMs = global,
-            repeatCount = repeat.coerceAtLeast(0),
-            randomDelayMinMs = rMin.coerceAtLeast(0L),
-            randomDelayMaxMs = rMax.coerceAtLeast(0L)
+            repeatCount = repeat.coerceAtLeast(0)
         )
     }
 
@@ -577,22 +553,15 @@ class MainActivity : AppCompatActivity() {
             return null
         }
         val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
-        val rMin = binding.etRandomMin.text?.toString()?.toLongOrNull() ?: 0L
-        val rMax = binding.etRandomMax.text?.toString()?.toLongOrNull() ?: 0L
         val repeat = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
 
-        if (rMin > 0L && rMax > 0L && rMin >= rMax) {
-            Toast.makeText(this, "랜덤 딜레이 최대값이 최솟값보다 커야 합니다.", Toast.LENGTH_SHORT).show()
-            return null
-        }
         if (global < 100) {
             Toast.makeText(this, "딜레이는 최소 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
             return null
         }
         for (p in points) {
-            val d = if (p.delayAfterMs >= 0) p.delayAfterMs else global
-            if (d < 100) {
-                Toast.makeText(this, "각 포인트 딜레이(또는 공통)는 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
+            if (p.delayAfterMs >= 0 && p.delayAfterMs < 100) {
+                Toast.makeText(this, "포인트 개별 딜레이는 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                 return null
             }
             if (p.gesture == GestureType.LONG_PRESS &&
@@ -612,9 +581,7 @@ class MainActivity : AppCompatActivity() {
         return ClickSequenceConfig(
             points = points.toList(),
             globalDelayMs = global,
-            repeatCount = repeat.coerceAtLeast(0),
-            randomDelayMinMs = rMin.coerceAtLeast(0L),
-            randomDelayMaxMs = rMax.coerceAtLeast(0L)
+            repeatCount = repeat.coerceAtLeast(0)
         )
     }
 
@@ -649,8 +616,6 @@ class MainActivity : AppCompatActivity() {
         binding.tvStatus.text = getString(
             if (running) R.string.status_running else R.string.status_idle
         )
-        // 자동 클릭 실행 중엔 시각화 오버레이 숨김
-        if (running) stopCoordOverlay() else startCoordOverlay()
     }
 
     // ── 권한 상태 ────────────────────────────────────────────────────────

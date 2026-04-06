@@ -43,6 +43,16 @@
         android:padding="0dp"
         android:stateListAnimator="@null" />
 
+    <!-- 마커 숨기기/보이기 -->
+    <ImageButton
+        android:id="@+id/btnOverlayToggleMarkers"
+        android:layout_width="44dp"
+        android:layout_height="36dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_eye"
+        android:tint="#6366F1"
+        android:contentDescription="마커 숨기기/보이기" />
+
     <!-- 포인트 추가 -->
     <ImageButton
         android:id="@+id/btnOverlayAddPoint"
