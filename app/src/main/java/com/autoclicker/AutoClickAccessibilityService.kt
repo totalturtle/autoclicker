@@ -145,6 +145,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
         broadcastStarted()
 
         clickJob = serviceScope.launch {
+            delay(300L) // 재생 버튼 터치가 완전히 처리된 후 첫 제스처 시작
             SessionLogger.startSession()
             val infinite = config.repeatCount == 0
             var round = 0
