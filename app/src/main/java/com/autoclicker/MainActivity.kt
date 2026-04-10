@@ -267,6 +267,8 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "딜레이는 최소 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            // OverlayService가 포그라운드에서 포인트를 추가했을 수 있으므로 prefs 재동기화
+            syncPointsFromPrefs()
             if (points.isEmpty()) {
                 Toast.makeText(this, "적용할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
