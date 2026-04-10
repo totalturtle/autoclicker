@@ -41,6 +41,7 @@ class PointSettingsActivity : AppCompatActivity() {
         d.btnPickStart.visibility   = View.GONE
         d.btnPickEnd.visibility     = View.GONE
         d.btnPickTrigger.visibility = View.GONE
+        d.btnPickColor.visibility   = View.GONE
 
         // 현재 포인트 값으로 채우기
         d.etDialogX.setText(point.x.toString())
@@ -91,6 +92,18 @@ class PointSettingsActivity : AppCompatActivity() {
             d.spinnerTriggerAction.setSelection(actionPos)
             d.groupTriggerRetry.visibility = if (actionPos == 1) View.VISIBLE else View.GONE
         }
+
+        // 기존 색상값 프리뷰 표시
+        val initColor = TriggerCondition.parseColor(d.etTriggerColor.text?.toString() ?: "")
+        if (initColor != null) d.tvTriggerColorPreview.setBackgroundColor(initColor)
+        d.etTriggerColor.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val c = TriggerCondition.parseColor(s?.toString() ?: "") ?: return
+                d.tvTriggerColorPreview.setBackgroundColor(c)
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        })
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE

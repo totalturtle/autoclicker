@@ -26,11 +26,13 @@ import android.widget.TextView
 class CoordPickerService : Service() {
 
     companion object {
-        const val EXTRA_PICK_TARGET = "pick_target"
-        const val TARGET_START       = "start"
-        const val TARGET_END         = "end"
-        const val TARGET_TRIGGER     = "trigger"
-        const val TARGET_OVERLAY_ADD = "overlay_add"
+        const val EXTRA_PICK_TARGET    = "pick_target"
+        const val TARGET_START         = "start"
+        const val TARGET_END           = "end"
+        const val TARGET_TRIGGER       = "trigger"
+        const val TARGET_OVERLAY_ADD   = "overlay_add"
+        const val TARGET_COLOR         = "color"          // MainActivity 다이얼로그용 색상 피커
+        const val TARGET_OVERLAY_COLOR = "overlay_color"  // OverlayService 다이얼로그용 색상 피커
 
         /** OverlayService 가 수신하는 브로드캐스트 */
         const val ACTION_OVERLAY_COORD_PICKED = "com.autoclicker.OVERLAY_COORD_PICKED"
@@ -55,10 +57,12 @@ class CoordPickerService : Service() {
         val rootView = FrameLayout(this)
 
         val instructionText = when (target) {
-            TARGET_OVERLAY_ADD -> "클릭할 위치를 터치하세요\n(포인트로 즉시 추가됩니다)"
-            TARGET_END         -> "스와이프 끝 좌표를 터치하세요"
-            TARGET_TRIGGER     -> "트리거 확인 좌표를 터치하세요"
-            else               -> getString(R.string.coord_picker_instruction)
+            TARGET_OVERLAY_ADD   -> "클릭할 위치를 터치하세요\n(포인트로 즉시 추가됩니다)"
+            TARGET_END           -> "스와이프 끝 좌표를 터치하세요"
+            TARGET_TRIGGER       -> "트리거 확인 좌표를 터치하세요"
+            TARGET_COLOR,
+            TARGET_OVERLAY_COLOR -> "색상을 확인할 위치를 터치하세요\n(좌표와 픽셀 색상이 자동 입력됩니다)"
+            else                 -> getString(R.string.coord_picker_instruction)
         }
 
         val touchLayer = View(this).apply {
@@ -124,17 +128,28 @@ class CoordPickerService : Service() {
 
     private fun deliver(x: Int, y: Int, target: String) {
         dismiss()
-        if (target == TARGET_OVERLAY_ADD) {
-            // 오버레이에서 빠른 추가 — 앱 복귀 없이 브로드캐스트만
-            sendBroadcast(Intent(ACTION_OVERLAY_COORD_PICKED).apply {
-                setPackage(packageName)
-                putExtra(EXTRA_PICKED_X, x)
-                putExtra(EXTRA_PICKED_Y, y)
-            })
-        } else {
-            // 메인 다이얼로그 복원용
-            MainActivity.pickedCoord = Triple(x, y, target)
-            bringAppToFront()
+        when (target) {
+            TARGET_OVERLAY_ADD -> {
+                sendBroadcast(Intent(ACTION_OVERLAY_COORD_PICKED).apply {
+                    setPackage(packageName)
+                    putExtra(EXTRA_PICKED_X, x)
+                    putExtra(EXTRA_PICKED_Y, y)
+                })
+            }
+            TARGET_COLOR, TARGET_OVERLAY_COLOR -> {
+                // 색상 샘플링은 AccessibilityService에게 위임
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_REQUEST_COLOR_SAMPLE).apply {
+                    setPackage(packageName)
+                    putExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_X, x)
+                    putExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_Y, y)
+                    putExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET, target)
+                })
+                if (target == TARGET_COLOR) bringAppToFront()
+            }
+            else -> {
+                MainActivity.pickedCoord = Triple(x, y, target)
+                bringAppToFront()
+            }
         }
         stopSelf()
     }

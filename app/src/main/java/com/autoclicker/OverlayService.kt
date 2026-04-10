@@ -53,11 +53,12 @@ class OverlayService : Service() {
     private lateinit var overlayView:   View
     private lateinit var panelParams:   WindowManager.LayoutParams
 
-    private var isRunning        = false
-    private var isEditMode       = false
-    private var isDialogShowing  = false
+    private var isRunning             = false
+    private var isEditMode            = false
+    private var isDialogShowing       = false
+    private var pendingColorPickIndex = -1
     private var sequenceJson: String? = null
-    private var markersVisible   = true
+    private var markersVisible        = true
 
     /** 드래그 가능한 마커 목록 */
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
@@ -82,6 +83,16 @@ class OverlayService : Service() {
                 }
                 PointSettingsActivity.ACTION_POINT_UPDATED -> refreshMarkers()
                 ACTION_TOGGLE_MARKERS -> setMarkersVisible(!markersVisible)
+                AutoClickAccessibilityService.ACTION_COLOR_SAMPLED -> {
+                    val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET) ?: return
+                    if (target != CoordPickerService.TARGET_OVERLAY_COLOR) return
+                    val x = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_X, 0)
+                    val y = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_Y, 0)
+                    val color = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLED_COLOR, -1)
+                    val idx = pendingColorPickIndex
+                    pendingColorPickIndex = -1
+                    if (idx >= 0) openPointSettings(idx, pickedColor = if (color >= 0) color else null, pickedX = x, pickedY = y)
+                }
             }
         }
     }
@@ -102,6 +113,7 @@ class OverlayService : Service() {
             addAction(AutoClickAccessibilityService.ACTION_STARTED)
             addAction(AutoClickAccessibilityService.ACTION_STOP)
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
+            addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
             addAction(ACTION_TOGGLE_MARKERS)
         }
@@ -397,7 +409,7 @@ class OverlayService : Service() {
         }
     }
 
-    private fun openPointSettings(index: Int) {
+    private fun openPointSettings(index: Int, pickedColor: Int? = null, pickedX: Int? = null, pickedY: Int? = null) {
         if (isDialogShowing) return  // 연쇄 오픈 방지
         val cfg = SequencePrefs.load(this) ?: return
         if (index >= cfg.points.size) return
@@ -461,6 +473,17 @@ class OverlayService : Service() {
             d.spinnerTriggerAction.setSelection(actPos)
             d.groupTriggerRetry.visibility = if (actPos == 1) View.VISIBLE else View.GONE
         }
+        // 색상 피커로 결과가 왔으면 트리거 필드에 적용
+        if (pickedColor != null && pickedX != null && pickedY != null) {
+            d.cbTrigger.isChecked     = true
+            d.groupTrigger.visibility = View.VISIBLE
+            d.etTriggerX.setText(pickedX.toString())
+            d.etTriggerY.setText(pickedY.toString())
+            val colorHex = "#%06X".format(pickedColor and 0xFFFFFF)
+            d.etTriggerColor.setText(colorHex)
+            d.tvTriggerColorPreview.setBackgroundColor(pickedColor)
+        }
+
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
@@ -471,6 +494,18 @@ class OverlayService : Service() {
             override fun onNothingSelected(p: AdapterView<*>?) = Unit
         }
 
+        // 색상 HEX 입력 시 프리뷰 업데이트
+        fun updateColorPreview(hex: String) {
+            val c = TriggerCondition.parseColor(hex)
+            if (c != null) d.tvTriggerColorPreview.setBackgroundColor(c)
+        }
+        d.etTriggerColor.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { updateColorPreview(s?.toString() ?: "") }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        })
+        updateColorPreview(d.etTriggerColor.text?.toString() ?: "#FF0000")
+
         val dialog = MaterialAlertDialogBuilder(themedCtx)
             .setTitle("포인트 #${index + 1} 설정")
             .setView(d.root)
@@ -478,6 +513,15 @@ class OverlayService : Service() {
             .setNegativeButton("취소", null)
             .setPositiveButton("확인") { _, _ -> savePointInOverlay(index, d, point, cfg) }
             .create()
+
+        // 색상 피커 버튼
+        d.btnPickColor.setOnClickListener {
+            pendingColorPickIndex = index
+            dialog.dismiss()
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_OVERLAY_COLOR)
+            })
+        }
 
         // 오버레이 윈도우 타입으로 띄워야 배경 앱 위에 표시됨
         dialog.window?.setType(overlayType())

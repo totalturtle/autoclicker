@@ -60,6 +60,8 @@ class MainActivity : AppCompatActivity() {
         @Volatile var pickedCoord: Triple<Int, Int, String>? = null
         /** 피커가 취소되었을 때 true */
         @Volatile var pickCancelled: Boolean = false
+        /** AutoClickAccessibilityService 가 색상 샘플 결과를 저장 */
+        @Volatile var pickedColor: Triple<Int, Int, Int>? = null  // x, y, colorInt
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -111,6 +113,16 @@ class MainActivity : AppCompatActivity() {
                     pointAdapter.notifyDataSetChanged()
                     Toast.makeText(this@MainActivity, getString(R.string.toast_auto_profile_loaded, name), Toast.LENGTH_SHORT).show()
                 }
+                AutoClickAccessibilityService.ACTION_COLOR_SAMPLED -> {
+                    val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET) ?: return
+                    if (target != CoordPickerService.TARGET_COLOR) return
+                    val x = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_X, 0)
+                    val y = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_Y, 0)
+                    val color = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLED_COLOR, -1)
+                    pickedColor = Triple(x, y, color)
+                    // onResume에서 처리되도록 앱이 이미 포그라운드에 있으면 직접 호출
+                    handlePickedCoord()
+                }
             }
         }
     }
@@ -154,6 +166,21 @@ class MainActivity : AppCompatActivity() {
                 pickCancelled = false
                 pendingDialogState?.let { showAddPointDialog(it) }
                 pendingDialogState = null
+            }
+            pickedColor != null -> {
+                val (x, y, color) = pickedColor!!
+                pickedColor = null
+                val base = pendingDialogState ?: PointDialogState()
+                pendingDialogState = null
+                val colorHex = if (color >= 0) "#%06X".format(color and 0xFFFFFF) else "#FF0000"
+                val updated = base.copy(
+                    triggerEnabled = true,
+                    triggerX = x.toString(),
+                    triggerY = y.toString(),
+                    triggerColor = colorHex
+                )
+                if (color < 0) Toast.makeText(this, "색상 읽기 실패 (API 30+ 필요)", Toast.LENGTH_SHORT).show()
+                showAddPointDialog(updated)
             }
             pickedCoord != null -> {
                 val (x, y, target) = pickedCoord!!
@@ -417,6 +444,21 @@ class MainActivity : AppCompatActivity() {
         dialogBinding.btnPickTrigger.setOnClickListener {
             launchPicker(CoordPickerService.TARGET_TRIGGER)
         }
+        dialogBinding.btnPickColor.setOnClickListener {
+            launchPicker(CoordPickerService.TARGET_COLOR)
+        }
+
+        // 색상 HEX 입력 시 프리뷰 업데이트
+        fun updateColorPreview(hex: String) {
+            val color = TriggerCondition.parseColor(hex)
+            if (color != null) dialogBinding.tvTriggerColorPreview.setBackgroundColor(color)
+        }
+        dialogBinding.etTriggerColor.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { updateColorPreview(s?.toString() ?: "") }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+        })
+        updateColorPreview(dialogBinding.etTriggerColor.text?.toString() ?: "#FF0000")
 
         dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.btn_add_point)
@@ -712,6 +754,7 @@ class MainActivity : AppCompatActivity() {
             addAction(AutoClickAccessibilityService.ACTION_STOP)
             addAction(AutoClickAccessibilityService.ACTION_STARTED)
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
+            addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)

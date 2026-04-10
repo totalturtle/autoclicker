@@ -31,10 +31,16 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val ACTION_CLICK_COUNT = "com.autoclicker.ACTION_CLICK_COUNT"
         const val ACTION_STARTED = "com.autoclicker.ACTION_STARTED"
         const val ACTION_AUTO_PROFILE = "com.autoclicker.ACTION_AUTO_PROFILE"
+        const val ACTION_REQUEST_COLOR_SAMPLE = "com.autoclicker.REQUEST_COLOR_SAMPLE"
+        const val ACTION_COLOR_SAMPLED = "com.autoclicker.COLOR_SAMPLED"
 
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
         const val EXTRA_COUNT = "extra_count"
         const val EXTRA_PROFILE_NAME = "extra_profile_name"
+        const val EXTRA_SAMPLE_X = "sample_x"
+        const val EXTRA_SAMPLE_Y = "sample_y"
+        const val EXTRA_SAMPLE_TARGET = "sample_target"
+        const val EXTRA_SAMPLED_COLOR = "sampled_color"
 
         var instance: AutoClickAccessibilityService? = null
             private set
@@ -61,6 +67,12 @@ class AutoClickAccessibilityService : AccessibilityService() {
                 }
                 ACTION_STOP -> stopClicking()
                 ACTION_TOGGLE -> toggleRun()
+                ACTION_REQUEST_COLOR_SAMPLE -> {
+                    val x = intent.getIntExtra(EXTRA_SAMPLE_X, 0)
+                    val y = intent.getIntExtra(EXTRA_SAMPLE_Y, 0)
+                    val target = intent.getStringExtra(EXTRA_SAMPLE_TARGET) ?: return
+                    serviceScope.launch { sampleColor(x, y, target) }
+                }
             }
         }
     }
@@ -73,6 +85,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
             addAction(ACTION_START)
             addAction(ACTION_STOP)
             addAction(ACTION_TOGGLE)
+            addAction(ACTION_REQUEST_COLOR_SAMPLE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(commandReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -234,6 +247,62 @@ class AutoClickAccessibilityService : AccessibilityService() {
                 }
             )
         }
+
+    private suspend fun sampleColor(x: Int, y: Int, target: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            // API 30 미만은 takeScreenshot 미지원 — 앱으로 복귀만
+            withContext(Dispatchers.Main) {
+                sendBroadcast(Intent(ACTION_COLOR_SAMPLED).apply {
+                    setPackage(packageName)
+                    putExtra(EXTRA_SAMPLE_X, x)
+                    putExtra(EXTRA_SAMPLE_Y, y)
+                    putExtra(EXTRA_SAMPLED_COLOR, -1)
+                    putExtra(EXTRA_SAMPLE_TARGET, target)
+                })
+            }
+            return
+        }
+        @Suppress("NewApi")
+        suspendCancellableCoroutine<Unit> { cont ->
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                ContextCompat.getMainExecutor(this@AutoClickAccessibilityService),
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        val color = runCatching {
+                            val hwBmp = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                            val swBmp = hwBmp?.copy(Bitmap.Config.ARGB_8888, false)
+                            hwBmp?.recycle()
+                            result.hardwareBuffer.close()
+                            val sx = x.coerceIn(0, (swBmp?.width ?: 1) - 1)
+                            val sy = y.coerceIn(0, (swBmp?.height ?: 1) - 1)
+                            val pixel = swBmp?.getPixel(sx, sy) ?: android.graphics.Color.BLACK
+                            swBmp?.recycle()
+                            pixel
+                        }.getOrDefault(android.graphics.Color.BLACK)
+                        sendBroadcast(Intent(ACTION_COLOR_SAMPLED).apply {
+                            setPackage(packageName)
+                            putExtra(EXTRA_SAMPLE_X, x)
+                            putExtra(EXTRA_SAMPLE_Y, y)
+                            putExtra(EXTRA_SAMPLED_COLOR, color)
+                            putExtra(EXTRA_SAMPLE_TARGET, target)
+                        })
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                    override fun onFailure(errorCode: Int) {
+                        sendBroadcast(Intent(ACTION_COLOR_SAMPLED).apply {
+                            setPackage(packageName)
+                            putExtra(EXTRA_SAMPLE_X, x)
+                            putExtra(EXTRA_SAMPLE_Y, y)
+                            putExtra(EXTRA_SAMPLED_COLOR, -1)
+                            putExtra(EXTRA_SAMPLE_TARGET, target)
+                        })
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                }
+            )
+        }
+    }
 
     private suspend fun dispatchStroke(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long) {
         val path = Path().apply {
