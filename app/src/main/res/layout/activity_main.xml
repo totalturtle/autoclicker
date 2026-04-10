@@ -239,7 +239,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="10dp">
+                    android:layout_marginBottom="6dp">
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="0dp"
@@ -272,6 +272,18 @@
                             android:textColor="@color/text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
+
+                <!-- 딜레이 전체 적용 버튼 -->
+                <Button
+                    android:id="@+id/btnApplyDelayToAll"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:text="딜레이 전체 적용"
+                    android:textSize="12sp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:layout_marginBottom="10dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
                 <!-- 볼륨 토글 -->
                 <com.google.android.material.switchmaterial.SwitchMaterial
