@@ -53,10 +53,11 @@ class OverlayService : Service() {
     private lateinit var overlayView:   View
     private lateinit var panelParams:   WindowManager.LayoutParams
 
-    private var isRunning       = false
-    private var isEditMode      = false
+    private var isRunning        = false
+    private var isEditMode       = false
+    private var isDialogShowing  = false
     private var sequenceJson: String? = null
-    private var markersVisible  = true
+    private var markersVisible   = true
 
     /** 드래그 가능한 마커 목록 */
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
@@ -182,6 +183,13 @@ class OverlayService : Service() {
 
         overlayView.findViewById<ImageButton>(R.id.btnOverlayToggleMarkers).setOnClickListener {
             setMarkersVisible(!markersVisible)
+        }
+
+        overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener {
+            if (isRunning) {
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+            }
+            stopSelf()
         }
     }
 
@@ -356,7 +364,16 @@ class OverlayService : Service() {
                     val dx = Math.abs(event.rawX - startRawX)
                     val dy = Math.abs(event.rawY - startRawY)
                     if (dx < tapThresh && dy < tapThresh) {
-                        openPointSettings(markerIdx)
+                        // 겹친 마커가 있을 때 가장 높은 인덱스(시각적으로 위에 있어야 할) 마커 선택
+                        val tapX = event.rawX.toInt()
+                        val tapY = event.rawY.toInt()
+                        val half = markerSizePx / 2
+                        val topIdx = markers.indexOfLast { entry ->
+                            val cx = entry.params.x + half
+                            val cy = entry.params.y + half
+                            Math.abs(cx - tapX) <= half && Math.abs(cy - tapY) <= half
+                        }
+                        openPointSettings(if (topIdx >= 0) topIdx else markerIdx)
                     } else {
                         val newX = params.x + markerSizePx / 2
                         val newY = params.y + markerSizePx / 2
@@ -370,8 +387,15 @@ class OverlayService : Service() {
     }
 
     private fun openPointSettings(index: Int) {
+        if (isDialogShowing) return  // 연쇄 오픈 방지
         val cfg = SequencePrefs.load(this) ?: return
         if (index >= cfg.points.size) return
+        // 다이얼로그가 열린 동안 마커 터치 차단
+        isDialogShowing = true
+        markers.forEach { entry ->
+            entry.params.flags = entry.params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
+        }
         val point = cfg.points[index]
 
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
@@ -446,6 +470,10 @@ class OverlayService : Service() {
 
         // 오버레이 윈도우 타입으로 띄워야 배경 앱 위에 표시됨
         dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener {
+            isDialogShowing = false
+            markers.forEach { updateMarkerTouchable(it) }
+        }
         dialog.show()
     }
 

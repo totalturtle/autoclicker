@@ -108,4 +108,19 @@
         android:paddingTop="6dp"
         android:paddingBottom="6dp" />
 
+    <View
+        android:layout_width="32dp"
+        android:layout_height="1dp"
+        android:background="#21262D" />
+
+    <!-- 앱 종료 -->
+    <ImageButton
+        android:id="@+id/btnOverlayPower"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_power"
+        android:tint="#E05252"
+        android:contentDescription="앱 종료" />
+
 </LinearLayout>
