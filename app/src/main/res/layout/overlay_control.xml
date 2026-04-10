@@ -113,6 +113,23 @@
         android:layout_height="1dp"
         android:background="#21262D" />
 
+    <!-- 포인트 초기화 -->
+    <Button
+        android:id="@+id/btnOverlayReset"
+        android:layout_width="44dp"
+        android:layout_height="28dp"
+        android:text="초기화"
+        android:textSize="8sp"
+        android:textColor="#E05252"
+        android:background="@drawable/bg_edit_mode_off"
+        android:padding="0dp"
+        android:stateListAnimator="@null" />
+
+    <View
+        android:layout_width="32dp"
+        android:layout_height="1dp"
+        android:background="#21262D" />
+
     <!-- 앱 종료 -->
     <ImageButton
         android:id="@+id/btnOverlayPower"

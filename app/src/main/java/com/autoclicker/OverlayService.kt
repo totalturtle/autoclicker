@@ -185,6 +185,17 @@ class OverlayService : Service() {
             setMarkersVisible(!markersVisible)
         }
 
+        overlayView.findViewById<Button>(R.id.btnOverlayReset).setOnClickListener {
+            if (isRunning) {
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+            }
+            val empty = SequencePrefs.load(this)?.copy(points = emptyList())
+                ?: ClickSequenceConfig(emptyList(), 1000L, 0)
+            SequencePrefs.save(this, empty)
+            sequenceJson = empty.toJsonString()
+            clearMarkers()
+        }
+
         overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener {
             if (isRunning) {
                 sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
