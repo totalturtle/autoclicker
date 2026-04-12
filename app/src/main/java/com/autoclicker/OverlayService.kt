@@ -12,6 +12,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.*
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -54,6 +55,7 @@ class OverlayService : Service() {
     private lateinit var panelParams:   WindowManager.LayoutParams
 
     private var isRunning             = false
+    private var lastToggleMs          = 0L
     private var isEditMode            = false
     private var isDialogShowing       = false
     private var pendingColorPickIndex = -1
@@ -88,10 +90,10 @@ class OverlayService : Service() {
                     if (target != CoordPickerService.TARGET_OVERLAY_COLOR) return
                     val x = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_X, 0)
                     val y = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_Y, 0)
-                    val color = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLED_COLOR, -1)
+                    val color = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLED_COLOR, Int.MIN_VALUE)
                     val idx = pendingColorPickIndex
                     pendingColorPickIndex = -1
-                    if (idx >= 0) openPointSettings(idx, pickedColor = if (color >= 0) color else null, pickedX = x, pickedY = y)
+                    if (idx >= 0) openPointSettings(idx, pickedColor = if (color != Int.MIN_VALUE) color else null)
                 }
             }
         }
@@ -181,15 +183,34 @@ class OverlayService : Service() {
             removeLastPoint()
         }
 
-        overlayView.findViewById<Button>(R.id.btnOverlayToggle).setOnClickListener {
-            if (isRunning) {
-                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
-            } else {
-                val json = sequenceJson ?: SequencePrefs.load(this)?.toJsonString() ?: return@setOnClickListener
-                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
-                    setPackage(packageName)
-                    putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
-                })
+        overlayView.findViewById<Button>(R.id.btnOverlayToggle).setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastToggleMs >= 400L) {
+                        lastToggleMs = now
+                        v.isPressed = true
+                        if (isRunning) {
+                            setRunningState(false)
+                            AutoClickAccessibilityService.instance?.requestStop()
+                                ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+                        } else {
+                            val json = sequenceJson ?: SequencePrefs.load(this)?.toJsonString()
+                            if (json != null) {
+                                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
+                                    setPackage(packageName)
+                                    putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
+                                })
+                            }
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    true
+                }
+                else -> false
             }
         }
 
@@ -409,7 +430,7 @@ class OverlayService : Service() {
         }
     }
 
-    private fun openPointSettings(index: Int, pickedColor: Int? = null, pickedX: Int? = null, pickedY: Int? = null) {
+    private fun openPointSettings(index: Int, pickedColor: Int? = null) {
         if (isDialogShowing) return  // 연쇄 오픈 방지
         val cfg = SequencePrefs.load(this) ?: return
         if (index >= cfg.points.size) return
@@ -461,8 +482,10 @@ class OverlayService : Service() {
 
         val trigger = point.trigger
         if (trigger != null) {
-            d.cbTrigger.isChecked     = true
-            d.groupTrigger.visibility = View.VISIBLE
+            d.cbTrigger.isChecked             = true
+            d.groupTrigger.visibility         = View.VISIBLE
+            d.cbTriggerSameAsPoint.isChecked  = trigger.usePointCoords
+            d.groupTriggerCoords.visibility   = if (!trigger.usePointCoords) View.VISIBLE else View.GONE
             d.etTriggerX.setText(trigger.checkX.toString())
             d.etTriggerY.setText(trigger.checkY.toString())
             d.etTriggerTolerance.setText(trigger.tolerance.toString())
@@ -473,12 +496,12 @@ class OverlayService : Service() {
             d.spinnerTriggerAction.setSelection(actPos)
             d.groupTriggerRetry.visibility = if (actPos == 1) View.VISIBLE else View.GONE
         }
-        // 색상 피커로 결과가 왔으면 트리거 필드에 적용
-        if (pickedColor != null && pickedX != null && pickedY != null) {
-            d.cbTrigger.isChecked     = true
-            d.groupTrigger.visibility = View.VISIBLE
-            d.etTriggerX.setText(pickedX.toString())
-            d.etTriggerY.setText(pickedY.toString())
+        // 색상 피커로 결과가 왔으면 색상값만 적용 (확인 위치 = 포인트 위치)
+        if (pickedColor != null) {
+            d.cbTrigger.isChecked            = true
+            d.groupTrigger.visibility        = View.VISIBLE
+            d.cbTriggerSameAsPoint.isChecked = true
+            d.groupTriggerCoords.visibility  = View.GONE
             val colorHex = "#%06X".format(pickedColor and 0xFFFFFF)
             d.etTriggerColor.setText(colorHex)
             d.tvTriggerColorPreview.setBackgroundColor(pickedColor)
@@ -486,6 +509,9 @@ class OverlayService : Service() {
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+        d.cbTriggerSameAsPoint.setOnCheckedChangeListener { _, sameAsPoint ->
+            d.groupTriggerCoords.visibility = if (!sameAsPoint) View.VISIBLE else View.GONE
         }
         d.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, position: Int, id: Long) {
@@ -565,8 +591,9 @@ class OverlayService : Service() {
         }
 
         val newTrigger = if (d.cbTrigger.isChecked) {
-            val cx    = d.etTriggerX.text?.toString()?.toIntOrNull()
-            val cy    = d.etTriggerY.text?.toString()?.toIntOrNull()
+            val sameAsPoint = d.cbTriggerSameAsPoint.isChecked
+            val cx    = if (sameAsPoint) x else d.etTriggerX.text?.toString()?.toIntOrNull()
+            val cy    = if (sameAsPoint) y else d.etTriggerY.text?.toString()?.toIntOrNull()
             val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
             if (cx == null || cy == null || color == null) original.trigger
             else {
@@ -575,7 +602,7 @@ class OverlayService : Service() {
                 val action = if (actPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                 val maxR   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                 val rDelay = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay, usePointCoords = sameAsPoint)
             }
         } else null
 

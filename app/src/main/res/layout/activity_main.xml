@@ -328,33 +328,6 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <!-- ── 시작 버튼 ── -->
-            <Button
-                android:id="@+id/btnStart"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="10dp"
-                android:text="시작"
-                android:textSize="16sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="sans-serif-medium"
-                android:background="@drawable/bg_btn_start"
-                android:stateListAnimator="@null" />
-
-            <!-- ── 정지 버튼 ── -->
-            <Button
-                android:id="@+id/btnStop"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="20dp"
-                android:text="정지"
-                android:textSize="16sp"
-                android:textColor="@color/btn_stop_text"
-                android:fontFamily="sans-serif-medium"
-                android:background="@drawable/bg_btn_stop"
-                android:stateListAnimator="@null"
-                android:enabled="false" />
-
             <!-- ── 하단 아이콘 버튼 행 ── -->
             <LinearLayout
                 android:layout_width="match_parent"

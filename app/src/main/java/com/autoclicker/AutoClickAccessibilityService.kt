@@ -33,6 +33,8 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val ACTION_AUTO_PROFILE = "com.autoclicker.ACTION_AUTO_PROFILE"
         const val ACTION_REQUEST_COLOR_SAMPLE = "com.autoclicker.REQUEST_COLOR_SAMPLE"
         const val ACTION_COLOR_SAMPLED = "com.autoclicker.COLOR_SAMPLED"
+        const val ACTION_REQUEST_DROPPER_SCREENSHOT = "com.autoclicker.REQUEST_DROPPER_SCREENSHOT"
+        const val ACTION_DROPPER_SCREENSHOT_READY = "com.autoclicker.DROPPER_SCREENSHOT_READY"
 
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
         const val EXTRA_COUNT = "extra_count"
@@ -41,6 +43,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val EXTRA_SAMPLE_Y = "sample_y"
         const val EXTRA_SAMPLE_TARGET = "sample_target"
         const val EXTRA_SAMPLED_COLOR = "sampled_color"
+        const val EXTRA_DROPPER_SCREENSHOT_PATH = "dropper_screenshot_path"
 
         var instance: AutoClickAccessibilityService? = null
             private set
@@ -73,6 +76,9 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     val target = intent.getStringExtra(EXTRA_SAMPLE_TARGET) ?: return
                     serviceScope.launch { sampleColor(x, y, target) }
                 }
+                ACTION_REQUEST_DROPPER_SCREENSHOT -> {
+                    serviceScope.launch { captureScreenshotForDropper() }
+                }
             }
         }
     }
@@ -86,6 +92,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
             addAction(ACTION_STOP)
             addAction(ACTION_TOGGLE)
             addAction(ACTION_REQUEST_COLOR_SAMPLE)
+            addAction(ACTION_REQUEST_DROPPER_SCREENSHOT)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(commandReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -187,6 +194,12 @@ class AutoClickAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** OverlayService 등 외부에서 즉시 정지할 때 사용 */
+    fun requestStop() {
+        stopClicking()
+        broadcastStop()
+    }
+
     private fun stopClicking() {
         clickJob?.cancel()
         clickJob = null
@@ -195,15 +208,16 @@ class AutoClickAccessibilityService : AccessibilityService() {
     private suspend fun performPoint(p: ClickPoint): Boolean {
         val trigger = p.trigger
         if (trigger != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val matched = checkColorTrigger(trigger)
+            val effectiveTrigger = if (trigger.usePointCoords) trigger.copy(checkX = p.x, checkY = p.y) else trigger
+            val matched = checkColorTrigger(effectiveTrigger)
             if (!matched) {
                 when (trigger.action) {
                     TriggerAction.SKIP -> return false
                     TriggerAction.WAIT_RETRY -> {
                         var found = false
-                        repeat(trigger.maxRetries) {
-                            delay(trigger.retryDelayMs)
-                            if (checkColorTrigger(trigger)) { found = true; return@repeat }
+                        repeat(effectiveTrigger.maxRetries) {
+                            delay(effectiveTrigger.retryDelayMs)
+                            if (checkColorTrigger(effectiveTrigger)) { found = true; return@repeat }
                         }
                         if (!found) return false
                     }
@@ -256,7 +270,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     setPackage(packageName)
                     putExtra(EXTRA_SAMPLE_X, x)
                     putExtra(EXTRA_SAMPLE_Y, y)
-                    putExtra(EXTRA_SAMPLED_COLOR, -1)
+                    putExtra(EXTRA_SAMPLED_COLOR, Int.MIN_VALUE)
                     putExtra(EXTRA_SAMPLE_TARGET, target)
                 })
             }
@@ -294,9 +308,57 @@ class AutoClickAccessibilityService : AccessibilityService() {
                             setPackage(packageName)
                             putExtra(EXTRA_SAMPLE_X, x)
                             putExtra(EXTRA_SAMPLE_Y, y)
-                            putExtra(EXTRA_SAMPLED_COLOR, -1)
+                            putExtra(EXTRA_SAMPLED_COLOR, Int.MIN_VALUE)
                             putExtra(EXTRA_SAMPLE_TARGET, target)
                         })
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                }
+            )
+        }
+    }
+
+    private suspend fun captureScreenshotForDropper() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            withContext(Dispatchers.Main) {
+                sendBroadcast(Intent(ACTION_DROPPER_SCREENSHOT_READY).apply { setPackage(packageName) })
+            }
+            return
+        }
+        @Suppress("NewApi")
+        suspendCancellableCoroutine<Unit> { cont ->
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                ContextCompat.getMainExecutor(this@AutoClickAccessibilityService),
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        serviceScope.launch(Dispatchers.IO) {
+                            runCatching {
+                                val hwBmp = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                                val swBmp = hwBmp?.copy(Bitmap.Config.ARGB_8888, false)
+                                hwBmp?.recycle()
+                                result.hardwareBuffer.close()
+                                val file = java.io.File(cacheDir, "dropper_screen.png")
+                                java.io.FileOutputStream(file).use { out ->
+                                    swBmp?.compress(Bitmap.CompressFormat.PNG, 85, out)
+                                }
+                                swBmp?.recycle()
+                                withContext(Dispatchers.Main) {
+                                    sendBroadcast(Intent(ACTION_DROPPER_SCREENSHOT_READY).apply {
+                                        setPackage(packageName)
+                                        putExtra(EXTRA_DROPPER_SCREENSHOT_PATH, file.absolutePath)
+                                    })
+                                }
+                            }.onFailure {
+                                withContext(Dispatchers.Main) {
+                                    sendBroadcast(Intent(ACTION_DROPPER_SCREENSHOT_READY).apply { setPackage(packageName) })
+                                }
+                            }
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+                    }
+                    override fun onFailure(errorCode: Int) {
+                        sendBroadcast(Intent(ACTION_DROPPER_SCREENSHOT_READY).apply { setPackage(packageName) })
                         if (cont.isActive) cont.resume(Unit)
                     }
                 }
