@@ -37,6 +37,7 @@ data class PointDialogState(
     val label: String = "",
     val delayAfter: String = "",
     val variance: String = "",
+    val pointRepeat: String = "1",
     val triggerEnabled: Boolean = false,
     val triggerSameAsPoint: Boolean = false,
     val triggerX: String = "",
@@ -318,6 +319,13 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "오차 ${variance}ms 를 모든 포인트에 적용했습니다.", Toast.LENGTH_SHORT).show()
         }
 
+        binding.btnApplyRepeat.setOnClickListener {
+            val repeat = binding.etRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            persistSequence()
+            val msg = if (repeat == 0) "무한 반복으로 설정했습니다." else "반복 횟수 ${repeat}회를 적용했습니다."
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        }
+
         binding.btnStats.setOnClickListener {
             startActivity(Intent(this, StatsActivity::class.java))
         }
@@ -390,6 +398,7 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogLabel.setText(prefill.label)
             dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
             dialogBinding.etDialogVariance.setText(prefill.variance)
+            dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
             dialogBinding.cbTriggerSameAsPoint.isChecked = prefill.triggerSameAsPoint
@@ -461,6 +470,7 @@ class MainActivity : AppCompatActivity() {
                 val label = dialogBinding.etDialogLabel.text?.toString()?.trim().orEmpty()
                 val delayAfter = dialogBinding.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
                 val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                val pointRepeat = dialogBinding.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
                 if (x == null || y == null) {
                     Toast.makeText(this, "X, Y 좌표를 입력하세요.", Toast.LENGTH_SHORT).show()
@@ -536,7 +546,8 @@ class MainActivity : AppCompatActivity() {
                         longPressDurationMs = longMs,
                         swipeDurationMs = swipeMs,
                         trigger = trigger,
-                        randomVarianceMs = variance
+                        randomVarianceMs = variance,
+                        pointRepeatCount = pointRepeat
                     )
                 )
                 pointAdapter.notifyItemInserted(points.size - 1)
@@ -559,6 +570,7 @@ class MainActivity : AppCompatActivity() {
         label          = d.etDialogLabel.text?.toString().orEmpty(),
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
+        pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
         triggerEnabled      = d.cbTrigger.isChecked,
         triggerSameAsPoint  = d.cbTriggerSameAsPoint.isChecked,
         triggerX            = d.etTriggerX.text?.toString().orEmpty(),

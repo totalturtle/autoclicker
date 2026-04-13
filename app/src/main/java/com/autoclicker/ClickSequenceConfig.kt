@@ -16,7 +16,8 @@ data class ClickPoint(
     val longPressDurationMs: Long = 450L,
     val swipeDurationMs: Long = 350L,
     val trigger: TriggerCondition? = null,
-    val randomVarianceMs: Long = 0L
+    val randomVarianceMs: Long = 0L,
+    val pointRepeatCount: Int = 1   // 해당 포인트 단독 반복 횟수 (1=반복 없음)
 )
 
 /**
@@ -63,9 +64,11 @@ data class ClickSequenceConfig(
                             put("act", p.trigger.action.name)
                             put("maxR", p.trigger.maxRetries)
                             put("rDelay", p.trigger.retryDelayMs)
+                            if (p.trigger.usePointCoords) put("upc", true)
                         })
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
+                    if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
                 }
             )
         }
@@ -97,7 +100,8 @@ data class ClickSequenceConfig(
                                 tolerance = t.optInt("tol", 20),
                                 action = TriggerAction.valueOf(t.optString("act", TriggerAction.SKIP.name)),
                                 maxRetries = t.optInt("maxR", 5),
-                                retryDelayMs = t.optLong("rDelay", 500L)
+                                retryDelayMs = t.optLong("rDelay", 500L),
+                                usePointCoords = t.optBoolean("upc", false)
                             )
                         }.getOrNull() else null
                         add(
@@ -112,7 +116,8 @@ data class ClickSequenceConfig(
                                 longPressDurationMs = o.optLong("ld", 450L).coerceIn(100L, 60_000L),
                                 swipeDurationMs = o.optLong("sd", 350L).coerceIn(50L, 60_000L),
                                 trigger = trigger,
-                                randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L)
+                                randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L),
+                                pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1)
                             )
                         )
                     }

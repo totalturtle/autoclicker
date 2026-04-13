@@ -273,7 +273,7 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- 딜레이/오차 전체 적용 버튼 행 -->
+                <!-- 딜레이/오차/반복 적용 버튼 행 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -282,23 +282,37 @@
 
                     <Button
                         android:id="@+id/btnApplyDelayToAll"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="32dp"
                         android:text="딜레이 전체 적용"
-                        android:textSize="12sp"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
-                        android:layout_marginEnd="8dp"
+                        android:textSize="11sp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:layout_marginEnd="6dp"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
                     <Button
                         android:id="@+id/btnApplyVarianceToAll"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="32dp"
                         android:text="오차 전체 적용"
-                        android:textSize="12sp"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
+                        android:textSize="11sp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:layout_marginEnd="6dp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                    <Button
+                        android:id="@+id/btnApplyRepeat"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="32dp"
+                        android:text="반복 적용"
+                        android:textSize="11sp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
 

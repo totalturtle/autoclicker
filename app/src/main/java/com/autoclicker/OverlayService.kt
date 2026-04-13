@@ -66,6 +66,10 @@ class OverlayService : Service() {
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
     private val markers = mutableListOf<MarkerEntry>()
 
+    /** 스와이프 끝점 마커 목록 */
+    private data class SwipeEndEntry(val view: View, val params: WindowManager.LayoutParams, val pointIndex: Int)
+    private val swipeEndMarkers = mutableListOf<SwipeEndEntry>()
+
     private val markerSizePx by lazy { dp(56) }
 
     // ── 브로드캐스트 리시버 ─────────────────────────────────────────────
@@ -195,7 +199,7 @@ class OverlayService : Service() {
                             AutoClickAccessibilityService.instance?.requestStop()
                                 ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
                         } else {
-                            val json = sequenceJson ?: SequencePrefs.load(this)?.toJsonString()
+                            val json = SequencePrefs.loadRawJson(this) ?: sequenceJson
                             if (json != null) {
                                 sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
                                     setPackage(packageName)
@@ -257,6 +261,14 @@ class OverlayService : Service() {
         }
         // 모든 마커의 터치 통과 여부 업데이트
         markers.forEach { updateMarkerTouchable(it) }
+        swipeEndMarkers.forEach { updateSwipeEndTouchable(it) }
+    }
+
+    private fun updateSwipeEndTouchable(entry: SwipeEndEntry) {
+        val flag = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (isEditMode) entry.params.flags = entry.params.flags and flag.inv()
+        else entry.params.flags = entry.params.flags or flag
+        runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
     }
 
     private fun updateMarkerTouchable(entry: MarkerEntry) {
@@ -279,12 +291,14 @@ class OverlayService : Service() {
         // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
         val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }
+        swipeEndMarkers.forEach { it.view.visibility = v }
     }
 
     private fun setMarkersVisible(visible: Boolean) {
         markersVisible = visible
         val v = if (markersVisible && !isRunning) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }
+        swipeEndMarkers.forEach { it.view.visibility = v }
         overlayView.findViewById<ImageButton>(R.id.btnOverlayToggleMarkers)?.alpha =
             if (markersVisible) 1f else 0.4f
     }
@@ -315,16 +329,23 @@ class OverlayService : Service() {
         sequenceJson = SequencePrefs.loadRawJson(this)
         val cfg = ClickSequenceConfig.fromJsonString(sequenceJson) ?: return
         clearMarkers()
-        cfg.points.forEachIndexed { idx, pt -> addMarkerView(idx, pt.x, pt.y) }
+        cfg.points.forEachIndexed { idx, pt ->
+            addMarkerView(idx, pt.x, pt.y)
+            if (pt.gesture == GestureType.SWIPE) addSwipeEndMarkerView(idx, pt.endX, pt.endY)
+        }
     }
 
     private fun refreshMarkers() {
         sequenceJson = SequencePrefs.loadRawJson(this)
         val cfg = ClickSequenceConfig.fromJsonString(sequenceJson)
         clearMarkers()
-        cfg?.points?.forEachIndexed { idx, pt -> addMarkerView(idx, pt.x, pt.y) }
+        cfg?.points?.forEachIndexed { idx, pt ->
+            addMarkerView(idx, pt.x, pt.y)
+            if (pt.gesture == GestureType.SWIPE) addSwipeEndMarkerView(idx, pt.endX, pt.endY)
+        }
         if (!markersVisible || isRunning) {
             markers.forEach { it.view.visibility = View.INVISIBLE }
+            swipeEndMarkers.forEach { it.view.visibility = View.INVISIBLE }
         }
     }
 
@@ -381,6 +402,72 @@ class OverlayService : Service() {
         markers.add(entry)
 
         setupMarkerTouch(view, params, index)
+    }
+
+    private fun addSwipeEndMarkerView(pointIndex: Int, x: Int, y: Int) {
+        val view = SwipeEndMarkerView(this, pointIndex + 1)
+        val touchFlag = if (isEditMode) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        val params = WindowManager.LayoutParams(
+            markerSizePx, markerSizePx,
+            x - markerSizePx / 2,
+            y - markerSizePx / 2,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    touchFlag,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.TOP or Gravity.START }
+        runCatching { windowManager.addView(view, params) }
+        val entry = SwipeEndEntry(view, params, pointIndex)
+        swipeEndMarkers.add(entry)
+        setupSwipeEndMarkerTouch(view, params, pointIndex)
+    }
+
+    private fun setupSwipeEndMarkerTouch(view: View, params: WindowManager.LayoutParams, pointIndex: Int) {
+        var startRawX = 0f; var startRawY = 0f
+        var initParamX = 0; var initParamY = 0
+        val tapThresh = dp(8)
+
+        view.setOnTouchListener { _, event ->
+            if (!isEditMode) return@setOnTouchListener false
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    startRawX = event.rawX; startRawY = event.rawY
+                    initParamX = params.x; initParamY = params.y
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initParamX + (event.rawX - startRawX).toInt()
+                    params.y = initParamY + (event.rawY - startRawY).toInt()
+                    runCatching { windowManager.updateViewLayout(view, params) }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val dx = Math.abs(event.rawX - startRawX)
+                    val dy = Math.abs(event.rawY - startRawY)
+                    if (dx < tapThresh && dy < tapThresh) {
+                        openPointSettings(pointIndex)
+                    } else {
+                        val newEndX = params.x + markerSizePx / 2
+                        val newEndY = params.y + markerSizePx / 2
+                        saveSwipeEndPosition(pointIndex, newEndX, newEndY)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun saveSwipeEndPosition(index: Int, endX: Int, endY: Int) {
+        val cfg = SequencePrefs.load(this) ?: return
+        if (index >= cfg.points.size) return
+        val pts = cfg.points.toMutableList()
+        pts[index] = pts[index].copy(endX = endX, endY = endY)
+        val updated = cfg.copy(points = pts)
+        SequencePrefs.save(this, updated)
+        sequenceJson = updated.toJsonString()
     }
 
     private fun setupMarkerTouch(view: View, params: WindowManager.LayoutParams, markerIdx: Int) {
@@ -440,6 +527,10 @@ class OverlayService : Service() {
             entry.params.flags = entry.params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
         }
+        swipeEndMarkers.forEach { entry ->
+            entry.params.flags = entry.params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
+        }
         val point = cfg.points[index]
 
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
@@ -454,6 +545,7 @@ class OverlayService : Service() {
         d.etDialogLabel.setText(point.label)
         if (point.delayAfterMs >= 0) d.etDialogDelayAfter.setText(point.delayAfterMs.toString())
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
+        d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
 
         val gesturePos = when (point.gesture) {
             GestureType.LONG_PRESS -> 1
@@ -463,6 +555,11 @@ class OverlayService : Service() {
         fun applyGestureUi(pos: Int) {
             d.groupSwipe.visibility       = if (pos == 2) View.VISIBLE else View.GONE
             d.tilDialogLongDur.visibility = if (pos == 1) View.VISIBLE else View.GONE
+            if (pos == 2) {
+                // 끝점은 오버레이 마커 드래그로 설정 — 좌표 입력 필드 숨김
+                (d.etDialogEndX.parent as? View)?.visibility = View.GONE
+                (d.etDialogEndY.parent as? View)?.visibility = View.GONE
+            }
         }
         d.spinnerGesture.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, position: Int, id: Long) = applyGestureUi(position)
@@ -472,8 +569,6 @@ class OverlayService : Service() {
         applyGestureUi(gesturePos)
 
         if (point.gesture == GestureType.SWIPE) {
-            d.etDialogEndX.setText(point.endX.toString())
-            d.etDialogEndY.setText(point.endY.toString())
             d.etDialogSwipeDur.setText(point.swipeDurationMs.toString())
         }
         if (point.gesture == GestureType.LONG_PRESS) {
@@ -567,6 +662,7 @@ class OverlayService : Service() {
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
         val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
         val variance = d.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
         var endX = x; var endY = y
         var longMs = original.longPressDurationMs
@@ -610,7 +706,8 @@ class OverlayService : Service() {
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
-            trigger = newTrigger, randomVarianceMs = variance
+            trigger = newTrigger, randomVarianceMs = variance,
+            pointRepeatCount = pointRepeat
         )
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
         SequencePrefs.save(this, cfg.copy(points = newPoints))
@@ -636,6 +733,8 @@ class OverlayService : Service() {
     private fun clearMarkers() {
         markers.forEach { runCatching { windowManager.removeView(it.view) } }
         markers.clear()
+        swipeEndMarkers.forEach { runCatching { windowManager.removeView(it.view) } }
+        swipeEndMarkers.clear()
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────────────
@@ -709,5 +808,50 @@ class MarkerDotView(context: Context, private val number: Int) : View(context) {
         // 번호
         textPaint.textSize = height * 0.34f
         canvas.drawText(number.toString(), cx, cy + textPaint.textSize * 0.36f, textPaint)
+    }
+}
+
+// ── 스와이프 끝점 마커 커스텀 뷰 ───────────────────────────────────────────
+
+class SwipeEndMarkerView(context: Context, private val pointNumber: Int) : View(context) {
+
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x80F85149.toInt()
+        style = Paint.Style.FILL
+    }
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xCCF85149.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(8f, 4f), 0f)
+    }
+    private val xPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xCCFFFFFF.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val cx = width / 2f
+        val cy = height / 2f
+        val r  = minOf(cx, cy) * 0.80f
+
+        canvas.drawCircle(cx, cy, r, fillPaint)
+        canvas.drawCircle(cx, cy, r, strokePaint)
+
+        // X 마크 (끝점 표시)
+        val arm = r * 0.40f
+        canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, xPaint)
+        canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, xPaint)
+
+        // "N-1" 레이블
+        textPaint.textSize = height * 0.26f
+        canvas.drawText("$pointNumber-1", cx, cy + textPaint.textSize * 0.36f, textPaint)
     }
 }

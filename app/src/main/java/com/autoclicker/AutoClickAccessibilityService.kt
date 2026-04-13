@@ -174,16 +174,19 @@ class AutoClickAccessibilityService : AccessibilityService() {
             try {
                 while (infinite || round < config.repeatCount) {
                     for (point in config.points) {
-                        ensureActive()
-                        val clicked = performPoint(point)
-                        if (clicked) {
-                            totalClicks++
-                            broadcastCount(totalClicks)
-                            SessionLogger.logClick(point.label, point.x, point.y)
-                        } else {
-                            SessionLogger.logSkip(point.label, point.x, point.y)
+                        val repeatTimes = point.pointRepeatCount.coerceAtLeast(1)
+                        for (r in 0 until repeatTimes) {
+                            ensureActive()
+                            val clicked = performPoint(point)
+                            if (clicked) {
+                                totalClicks++
+                                broadcastCount(totalClicks)
+                                SessionLogger.logClick(point.label, point.x, point.y)
+                            } else {
+                                SessionLogger.logSkip(point.label, point.x, point.y)
+                            }
+                            delay(config.delayAfter(point))
                         }
-                        delay(config.delayAfter(point))
                     }
                     round++
                 }
