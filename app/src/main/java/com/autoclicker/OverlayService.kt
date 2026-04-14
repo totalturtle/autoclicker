@@ -66,8 +66,8 @@ class OverlayService : Service() {
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
     private val markers = mutableListOf<MarkerEntry>()
 
-    /** 스와이프 끝점 마커 목록 */
-    private data class SwipeEndEntry(val view: View, val params: WindowManager.LayoutParams, val pointIndex: Int)
+    /** 스와이프 경유점 마커 목록 (waypointIndex: 0=1-1, 1=1-2, ...) */
+    private data class SwipeEndEntry(val view: View, val params: WindowManager.LayoutParams, val pointIndex: Int, val waypointIndex: Int)
     private val swipeEndMarkers = mutableListOf<SwipeEndEntry>()
 
     private val markerSizePx by lazy { dp(56) }
@@ -95,9 +95,17 @@ class OverlayService : Service() {
                     val x = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_X, 0)
                     val y = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_Y, 0)
                     val color = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_SAMPLED_COLOR, Int.MIN_VALUE)
+                    val move  = intent.getBooleanExtra(AutoClickAccessibilityService.EXTRA_MOVE_TO_DROPPER, false)
                     val idx = pendingColorPickIndex
                     pendingColorPickIndex = -1
-                    if (idx >= 0) openPointSettings(idx, pickedColor = if (color != Int.MIN_VALUE) color else null)
+                    // color == Int.MIN_VALUE 는 취소 신호 — 다이얼로그 재오픈 없이 인덱스만 초기화
+                    if (idx >= 0 && color != Int.MIN_VALUE) openPointSettings(
+                        idx, pickedColor = color,
+                        triggerCheckX = x,
+                        triggerCheckY = y,
+                        dropperX = if (move) x else null,
+                        dropperY = if (move) y else null
+                    )
                 }
             }
         }
@@ -331,7 +339,12 @@ class OverlayService : Service() {
         clearMarkers()
         cfg.points.forEachIndexed { idx, pt ->
             addMarkerView(idx, pt.x, pt.y)
-            if (pt.gesture == GestureType.SWIPE) addSwipeEndMarkerView(idx, pt.endX, pt.endY)
+            if (pt.gesture == GestureType.SWIPE) {
+                addSwipeEndMarkerView(idx, pt.endX, pt.endY, 0)
+                pt.swipeExtraPoints.forEachIndexed { wpIdx, wp ->
+                    addSwipeEndMarkerView(idx, wp.x, wp.y, wpIdx + 1)
+                }
+            }
         }
     }
 
@@ -341,7 +354,12 @@ class OverlayService : Service() {
         clearMarkers()
         cfg?.points?.forEachIndexed { idx, pt ->
             addMarkerView(idx, pt.x, pt.y)
-            if (pt.gesture == GestureType.SWIPE) addSwipeEndMarkerView(idx, pt.endX, pt.endY)
+            if (pt.gesture == GestureType.SWIPE) {
+                addSwipeEndMarkerView(idx, pt.endX, pt.endY, 0)
+                pt.swipeExtraPoints.forEachIndexed { wpIdx, wp ->
+                    addSwipeEndMarkerView(idx, wp.x, wp.y, wpIdx + 1)
+                }
+            }
         }
         if (!markersVisible || isRunning) {
             markers.forEach { it.view.visibility = View.INVISIBLE }
@@ -372,11 +390,7 @@ class OverlayService : Service() {
         val updated = cfg.copy(points = cfg.points.dropLast(1))
         SequencePrefs.save(this, updated)
         sequenceJson = updated.toJsonString()
-
-        markers.lastOrNull()?.let {
-            runCatching { windowManager.removeView(it.view) }
-            markers.removeLast()
-        }
+        refreshMarkers()
     }
 
     private fun addMarkerView(index: Int, x: Int, y: Int) {
@@ -404,8 +418,8 @@ class OverlayService : Service() {
         setupMarkerTouch(view, params, index)
     }
 
-    private fun addSwipeEndMarkerView(pointIndex: Int, x: Int, y: Int) {
-        val view = SwipeEndMarkerView(this, pointIndex + 1)
+    private fun addSwipeEndMarkerView(pointIndex: Int, x: Int, y: Int, waypointIndex: Int) {
+        val view = SwipeEndMarkerView(this, pointIndex + 1, waypointIndex + 1)
         val touchFlag = if (isEditMode) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         val params = WindowManager.LayoutParams(
             markerSizePx, markerSizePx,
@@ -419,12 +433,12 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
         runCatching { windowManager.addView(view, params) }
-        val entry = SwipeEndEntry(view, params, pointIndex)
+        val entry = SwipeEndEntry(view, params, pointIndex, waypointIndex)
         swipeEndMarkers.add(entry)
-        setupSwipeEndMarkerTouch(view, params, pointIndex)
+        setupSwipeEndMarkerTouch(view, params, pointIndex, waypointIndex)
     }
 
-    private fun setupSwipeEndMarkerTouch(view: View, params: WindowManager.LayoutParams, pointIndex: Int) {
+    private fun setupSwipeEndMarkerTouch(view: View, params: WindowManager.LayoutParams, pointIndex: Int, waypointIndex: Int) {
         var startRawX = 0f; var startRawY = 0f
         var initParamX = 0; var initParamY = 0
         val tapThresh = dp(8)
@@ -449,9 +463,9 @@ class OverlayService : Service() {
                     if (dx < tapThresh && dy < tapThresh) {
                         openPointSettings(pointIndex)
                     } else {
-                        val newEndX = params.x + markerSizePx / 2
-                        val newEndY = params.y + markerSizePx / 2
-                        saveSwipeEndPosition(pointIndex, newEndX, newEndY)
+                        val newX = params.x + markerSizePx / 2
+                        val newY = params.y + markerSizePx / 2
+                        saveSwipeWaypointPosition(pointIndex, waypointIndex, newX, newY)
                     }
                     true
                 }
@@ -460,11 +474,21 @@ class OverlayService : Service() {
         }
     }
 
-    private fun saveSwipeEndPosition(index: Int, endX: Int, endY: Int) {
+    private fun saveSwipeWaypointPosition(pointIndex: Int, waypointIndex: Int, x: Int, y: Int) {
         val cfg = SequencePrefs.load(this) ?: return
-        if (index >= cfg.points.size) return
+        if (pointIndex >= cfg.points.size) return
         val pts = cfg.points.toMutableList()
-        pts[index] = pts[index].copy(endX = endX, endY = endY)
+        val pt = pts[pointIndex]
+        pts[pointIndex] = if (waypointIndex == 0) {
+            pt.copy(endX = x, endY = y)
+        } else {
+            val extras = pt.swipeExtraPoints.toMutableList()
+            val idx = waypointIndex - 1
+            if (idx < extras.size) {
+                extras[idx] = SwipeWaypoint(x, y)
+                pt.copy(swipeExtraPoints = extras)
+            } else pt
+        }
         val updated = cfg.copy(points = pts)
         SequencePrefs.save(this, updated)
         sequenceJson = updated.toJsonString()
@@ -517,7 +541,7 @@ class OverlayService : Service() {
         }
     }
 
-    private fun openPointSettings(index: Int, pickedColor: Int? = null) {
+    private fun openPointSettings(index: Int, pickedColor: Int? = null, triggerCheckX: Int? = null, triggerCheckY: Int? = null, dropperX: Int? = null, dropperY: Int? = null) {
         if (isDialogShowing) return  // 연쇄 오픈 방지
         val cfg = SequencePrefs.load(this) ?: return
         if (index >= cfg.points.size) return
@@ -570,6 +594,10 @@ class OverlayService : Service() {
 
         if (point.gesture == GestureType.SWIPE) {
             d.etDialogSwipeDur.setText(point.swipeDurationMs.toString())
+            // 꺾임 개수 표시 (버튼 리스너는 dialog 생성 후 설정)
+            d.tvSwipeWaypointCount.text = if (point.swipeExtraPoints.isEmpty()) "꺾임: 없음" else "꺾임: ${point.swipeExtraPoints.size}개"
+            d.btnRemoveWaypoint.isEnabled = point.swipeExtraPoints.isNotEmpty()
+            d.groupSwipeWaypoints.visibility = View.VISIBLE
         }
         if (point.gesture == GestureType.LONG_PRESS) {
             d.etDialogLongDur.setText(point.longPressDurationMs.toString())
@@ -591,15 +619,23 @@ class OverlayService : Service() {
             d.spinnerTriggerAction.setSelection(actPos)
             d.groupTriggerRetry.visibility = if (actPos == 1) View.VISIBLE else View.GONE
         }
-        // 색상 피커로 결과가 왔으면 색상값만 적용 (확인 위치 = 포인트 위치)
+        // 색상 피커로 결과가 왔으면 색상·위치 적용
         if (pickedColor != null) {
-            d.cbTrigger.isChecked            = true
-            d.groupTrigger.visibility        = View.VISIBLE
-            d.cbTriggerSameAsPoint.isChecked = true
-            d.groupTriggerCoords.visibility  = View.GONE
+            // 스포이트 위치로 포인트 이동 옵션이 켜져 있으면 탭 X/Y도 덮어씀
+            if (dropperX != null && dropperY != null) {
+                d.etDialogX.setText(dropperX.toString())
+                d.etDialogY.setText(dropperY.toString())
+            }
+            d.cbTrigger.isChecked     = true
+            d.groupTrigger.visibility = View.VISIBLE
             val colorHex = "#%06X".format(pickedColor and 0xFFFFFF)
             d.etTriggerColor.setText(colorHex)
             d.tvTriggerColorPreview.setBackgroundColor(pickedColor)
+            // 항상: 스포이트 위치 = 색상 체크 좌표, "동일하게 확인" 해제
+            d.cbTriggerSameAsPoint.isChecked = false
+            d.groupTriggerCoords.visibility  = View.VISIBLE
+            d.etTriggerX.setText(triggerCheckX.toString())
+            d.etTriggerY.setText(triggerCheckY.toString())
         }
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
@@ -642,6 +678,40 @@ class OverlayService : Service() {
             startService(Intent(this, CoordPickerService::class.java).apply {
                 putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_OVERLAY_COLOR)
             })
+        }
+
+        // 꺾임 추가/삭제 버튼 (dialog 참조 필요하므로 생성 후 설정)
+        fun updateWaypointUi(extras: List<SwipeWaypoint>) {
+            d.tvSwipeWaypointCount.text = if (extras.isEmpty()) "꺾임: 없음" else "꺾임: ${extras.size}개"
+            d.btnRemoveWaypoint.isEnabled = extras.isNotEmpty()
+        }
+        d.btnAddWaypoint.setOnClickListener {
+            savePointInOverlay(index, d, point, cfg)
+            val freshCfg = SequencePrefs.load(this) ?: return@setOnClickListener
+            val freshPt = freshCfg.points.getOrNull(index) ?: return@setOnClickListener
+            val lastX = freshPt.swipeExtraPoints.lastOrNull()?.x ?: freshPt.endX
+            val lastY = freshPt.swipeExtraPoints.lastOrNull()?.y ?: freshPt.endY
+            val newExtras = freshPt.swipeExtraPoints + SwipeWaypoint(lastX, lastY)
+            val saved = freshCfg.copy(points = freshCfg.points.toMutableList().also {
+                it[index] = freshPt.copy(swipeExtraPoints = newExtras)
+            })
+            SequencePrefs.save(this, saved)
+            sequenceJson = saved.toJsonString()
+            dialog.dismiss()
+            refreshMarkers()
+        }
+        d.btnRemoveWaypoint.setOnClickListener {
+            val freshCfg = SequencePrefs.load(this) ?: return@setOnClickListener
+            val freshPt = freshCfg.points.getOrNull(index) ?: return@setOnClickListener
+            if (freshPt.swipeExtraPoints.isEmpty()) return@setOnClickListener
+            val newExtras = freshPt.swipeExtraPoints.dropLast(1)
+            val saved = freshCfg.copy(points = freshCfg.points.toMutableList().also {
+                it[index] = freshPt.copy(swipeExtraPoints = newExtras)
+            })
+            SequencePrefs.save(this, saved)
+            sequenceJson = saved.toJsonString()
+            updateWaypointUi(newExtras)
+            refreshMarkers()
         }
 
         // 오버레이 윈도우 타입으로 띄워야 배경 앱 위에 표시됨
@@ -702,12 +772,17 @@ class OverlayService : Service() {
             }
         } else null
 
+        // swipeExtraPoints는 드래그/꺾임 추가·삭제로 prefs에 직접 저장되므로 항상 최신 prefs 값 사용
+        val freshExtras = if (gesture == GestureType.SWIPE)
+            SequencePrefs.load(this)?.points?.getOrNull(index)?.swipeExtraPoints ?: original.swipeExtraPoints
+        else emptyList()
         val updated = original.copy(
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, randomVarianceMs = variance,
-            pointRepeatCount = pointRepeat
+            pointRepeatCount = pointRepeat,
+            swipeExtraPoints = freshExtras
         )
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
         SequencePrefs.save(this, cfg.copy(points = newPoints))
@@ -813,7 +888,7 @@ class MarkerDotView(context: Context, private val number: Int) : View(context) {
 
 // ── 스와이프 끝점 마커 커스텀 뷰 ───────────────────────────────────────────
 
-class SwipeEndMarkerView(context: Context, private val pointNumber: Int) : View(context) {
+class SwipeEndMarkerView(context: Context, private val pointNumber: Int, private val waypointNumber: Int = 1) : View(context) {
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0x80F85149.toInt()
@@ -852,6 +927,6 @@ class SwipeEndMarkerView(context: Context, private val pointNumber: Int) : View(
 
         // "N-1" 레이블
         textPaint.textSize = height * 0.26f
-        canvas.drawText("$pointNumber-1", cx, cy + textPaint.textSize * 0.36f, textPaint)
+        canvas.drawText("$pointNumber-$waypointNumber", cx, cy + textPaint.textSize * 0.36f, textPaint)
     }
 }
