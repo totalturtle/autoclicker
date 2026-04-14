@@ -4,6 +4,9 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** 스와이프 경유점 (꺾임 중간점) */
+data class SwipeWaypoint(val x: Int, val y: Int)
+
 /** 단일 포인트/제스처. delayAfterMs가 음수이면 시퀀스 공통 딜레이 사용 */
 data class ClickPoint(
     val x: Int,
@@ -17,7 +20,8 @@ data class ClickPoint(
     val swipeDurationMs: Long = 350L,
     val trigger: TriggerCondition? = null,
     val randomVarianceMs: Long = 0L,
-    val pointRepeatCount: Int = 1   // 해당 포인트 단독 반복 횟수 (1=반복 없음)
+    val pointRepeatCount: Int = 1,        // 해당 포인트 단독 반복 횟수 (1=반복 없음)
+    val swipeExtraPoints: List<SwipeWaypoint> = emptyList() // 꺾임 경유점 (1-2, 1-3, ...)
 )
 
 /**
@@ -64,11 +68,15 @@ data class ClickSequenceConfig(
                             put("act", p.trigger.action.name)
                             put("maxR", p.trigger.maxRetries)
                             put("rDelay", p.trigger.retryDelayMs)
-                            if (p.trigger.usePointCoords) put("upc", true)
                         })
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
                     if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
+                    if (p.swipeExtraPoints.isNotEmpty()) put("swp", JSONArray().also { arr ->
+                        p.swipeExtraPoints.forEach { wp ->
+                            arr.put(JSONObject().apply { put("x", wp.x); put("y", wp.y) })
+                        }
+                    })
                 }
             )
         }
@@ -100,8 +108,7 @@ data class ClickSequenceConfig(
                                 tolerance = t.optInt("tol", 20),
                                 action = TriggerAction.valueOf(t.optString("act", TriggerAction.SKIP.name)),
                                 maxRetries = t.optInt("maxR", 5),
-                                retryDelayMs = t.optLong("rDelay", 500L),
-                                usePointCoords = t.optBoolean("upc", false)
+                                retryDelayMs = t.optLong("rDelay", 500L)
                             )
                         }.getOrNull() else null
                         add(
@@ -117,7 +124,14 @@ data class ClickSequenceConfig(
                                 swipeDurationMs = o.optLong("sd", 350L).coerceIn(50L, 60_000L),
                                 trigger = trigger,
                                 randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L),
-                                pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1)
+                                pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1),
+                                swipeExtraPoints = if (o.has("swp")) {
+                                    val arr = o.getJSONArray("swp")
+                                    buildList { for (i in 0 until arr.length()) {
+                                        val w = arr.getJSONObject(i)
+                                        add(SwipeWaypoint(w.getInt("x"), w.getInt("y")))
+                                    }}
+                                } else emptyList()
                             )
                         )
                     }

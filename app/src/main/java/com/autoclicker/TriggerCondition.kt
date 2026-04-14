@@ -12,8 +12,7 @@ data class TriggerCondition(
     val tolerance: Int = 20,
     val action: TriggerAction = TriggerAction.SKIP,
     val maxRetries: Int = 5,
-    val retryDelayMs: Long = 500L,
-    val usePointCoords: Boolean = false   // true이면 checkX/checkY 대신 포인트 좌표로 확인
+    val retryDelayMs: Long = 500L
 ) {
     fun colorHex(): String = String.format("#%06X", targetColor and 0xFFFFFF)
 

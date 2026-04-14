@@ -206,16 +206,15 @@ class AutoClickAccessibilityService : AccessibilityService() {
     private suspend fun performPoint(p: ClickPoint): Boolean {
         val trigger = p.trigger
         if (trigger != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val effectiveTrigger = if (trigger.usePointCoords) trigger.copy(checkX = p.x, checkY = p.y) else trigger
-            val matched = checkColorTrigger(effectiveTrigger)
+            val matched = checkColorTrigger(trigger)
             if (!matched) {
                 when (trigger.action) {
                     TriggerAction.SKIP -> return false
                     TriggerAction.WAIT_RETRY -> {
                         var found = false
-                        for (i in 0 until effectiveTrigger.maxRetries) {
-                            delay(effectiveTrigger.retryDelayMs)
-                            if (checkColorTrigger(effectiveTrigger)) { found = true; break }
+                        for (i in 0 until trigger.maxRetries) {
+                            delay(trigger.retryDelayMs)
+                            if (checkColorTrigger(trigger)) { found = true; break }
                         }
                         if (!found) return false
                     }
@@ -268,11 +267,11 @@ class AutoClickAccessibilityService : AccessibilityService() {
                             }
                         }.fold(
                             onSuccess = { match -> if (cont.isActive) cont.resume(match) },
-                            onFailure = { if (cont.isActive) cont.resume(true) }
+                            onFailure = { if (cont.isActive) cont.resume(false) }
                         )
                     }
                     override fun onFailure(errorCode: Int) {
-                        if (cont.isActive) cont.resume(true)
+                        if (cont.isActive) cont.resume(false)
                     }
                 }
             )

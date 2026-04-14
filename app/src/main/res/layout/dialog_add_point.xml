@@ -117,6 +117,49 @@
                     android:inputType="number"
                     android:text="350" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 꺾임 경유점 추가/삭제 (오버레이 다이얼로그에서만 표시) -->
+            <LinearLayout
+                android:id="@+id/groupSwipeWaypoints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvSwipeWaypointCount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="꺾임: 없음"
+                    android:textColor="#BBBBBB"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddWaypoint"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="꺾임 추가" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRemoveWaypoint"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:enabled="false"
+                    android:text="꺾임 삭제" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -224,16 +267,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone">
-
-            <!-- 포인트 위치와 동일하게 체크 시 X/Y 그룹 숨김 -->
-            <CheckBox
-                android:id="@+id/cbTriggerSameAsPoint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="포인트 위치와 동일하게 확인"
-                android:textColor="#BBBBBB"
-                android:textSize="12sp" />
 
             <LinearLayout
                 android:id="@+id/groupTriggerCoords"

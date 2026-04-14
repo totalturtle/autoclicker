@@ -605,10 +605,9 @@ class OverlayService : Service() {
 
         val trigger = point.trigger
         if (trigger != null) {
-            d.cbTrigger.isChecked             = true
-            d.groupTrigger.visibility         = View.VISIBLE
-            d.cbTriggerSameAsPoint.isChecked  = trigger.usePointCoords
-            d.groupTriggerCoords.visibility   = if (!trigger.usePointCoords) View.VISIBLE else View.GONE
+            d.cbTrigger.isChecked    = true
+            d.groupTrigger.visibility = View.VISIBLE
+            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(trigger.checkX.toString())
             d.etTriggerY.setText(trigger.checkY.toString())
             d.etTriggerTolerance.setText(trigger.tolerance.toString())
@@ -631,18 +630,13 @@ class OverlayService : Service() {
             val colorHex = "#%06X".format(pickedColor and 0xFFFFFF)
             d.etTriggerColor.setText(colorHex)
             d.tvTriggerColorPreview.setBackgroundColor(pickedColor)
-            // 항상: 스포이트 위치 = 색상 체크 좌표, "동일하게 확인" 해제
-            d.cbTriggerSameAsPoint.isChecked = false
-            d.groupTriggerCoords.visibility  = View.VISIBLE
+            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(triggerCheckX.toString())
             d.etTriggerY.setText(triggerCheckY.toString())
         }
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
-        }
-        d.cbTriggerSameAsPoint.setOnCheckedChangeListener { _, sameAsPoint ->
-            d.groupTriggerCoords.visibility = if (!sameAsPoint) View.VISIBLE else View.GONE
         }
         d.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, position: Int, id: Long) {
@@ -757,9 +751,8 @@ class OverlayService : Service() {
         }
 
         val newTrigger = if (d.cbTrigger.isChecked) {
-            val sameAsPoint = d.cbTriggerSameAsPoint.isChecked
-            val cx    = if (sameAsPoint) x else d.etTriggerX.text?.toString()?.toIntOrNull()
-            val cy    = if (sameAsPoint) y else d.etTriggerY.text?.toString()?.toIntOrNull()
+            val cx    = d.etTriggerX.text?.toString()?.toIntOrNull()
+            val cy    = d.etTriggerY.text?.toString()?.toIntOrNull()
             val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
             if (cx == null || cy == null || color == null) original.trigger
             else {
@@ -768,7 +761,7 @@ class OverlayService : Service() {
                 val action = if (actPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                 val maxR   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                 val rDelay = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay, usePointCoords = sameAsPoint)
+                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
             }
         } else null
 

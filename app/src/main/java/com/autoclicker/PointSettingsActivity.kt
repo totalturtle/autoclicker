@@ -81,10 +81,9 @@ class PointSettingsActivity : AppCompatActivity() {
 
         val trigger = point.trigger
         if (trigger != null) {
-            d.cbTrigger.isChecked            = true
-            d.groupTrigger.visibility        = View.VISIBLE
-            d.cbTriggerSameAsPoint.isChecked = trigger.usePointCoords
-            d.groupTriggerCoords.visibility  = if (!trigger.usePointCoords) View.VISIBLE else View.GONE
+            d.cbTrigger.isChecked    = true
+            d.groupTrigger.visibility = View.VISIBLE
+            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(trigger.checkX.toString())
             d.etTriggerY.setText(trigger.checkY.toString())
             d.etTriggerTolerance.setText(trigger.tolerance.toString())
@@ -111,9 +110,6 @@ class PointSettingsActivity : AppCompatActivity() {
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
-        }
-        d.cbTriggerSameAsPoint.setOnCheckedChangeListener { _, sameAsPoint ->
-            d.groupTriggerCoords.visibility = if (!sameAsPoint) View.VISIBLE else View.GONE
         }
         d.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -171,10 +167,9 @@ class PointSettingsActivity : AppCompatActivity() {
         }
 
         val newTrigger = if (d.cbTrigger.isChecked) {
-            val sameAsPoint = d.cbTriggerSameAsPoint.isChecked
-            val cx     = if (sameAsPoint) x else d.etTriggerX.text?.toString()?.toIntOrNull()
-            val cy     = if (sameAsPoint) y else d.etTriggerY.text?.toString()?.toIntOrNull()
-            val color  = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
+            val cx    = d.etTriggerX.text?.toString()?.toIntOrNull()
+            val cy    = d.etTriggerY.text?.toString()?.toIntOrNull()
+            val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
             if (cx == null || cy == null || color == null) { original.trigger }
             else {
                 val tol    = d.etTriggerTolerance.text?.toString()?.toIntOrNull()?.coerceIn(0, 255) ?: 20
@@ -182,7 +177,7 @@ class PointSettingsActivity : AppCompatActivity() {
                 val action = if (actPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                 val maxR   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                 val rDelay = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay, usePointCoords = sameAsPoint)
+                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
             }
         } else null
 
@@ -190,7 +185,8 @@ class PointSettingsActivity : AppCompatActivity() {
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
-            trigger = newTrigger, pointRepeatCount = pointRepeat
+            trigger = newTrigger, pointRepeatCount = pointRepeat,
+            swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList()
         )
 
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }

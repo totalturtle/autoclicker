@@ -197,7 +197,7 @@ class CoordPickerService : Service() {
         // tip 위치 계산
         private fun tipX(): Float = if (fingerX < 0) width / 2f else fingerX
         private fun tipY(): Float = if (fingerY < 0) height * 0.45f
-                                    else (fingerY - TIP_OFFSET_Y).toFloat().coerceAtLeast(dp(60).toFloat())
+                                    else (fingerY - TIP_OFFSET_Y).toFloat().coerceAtLeast(0f)
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
             fingerX = event.x

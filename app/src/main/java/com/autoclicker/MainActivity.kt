@@ -39,7 +39,6 @@ data class PointDialogState(
     val variance: String = "",
     val pointRepeat: String = "1",
     val triggerEnabled: Boolean = false,
-    val triggerSameAsPoint: Boolean = false,
     val triggerX: String = "",
     val triggerY: String = "",
     val triggerColor: String = "#FF0000",
@@ -176,9 +175,8 @@ class MainActivity : AppCompatActivity() {
                 pendingDialogState = null
                 val colorHex = if (color != Int.MIN_VALUE) "#%06X".format(color and 0xFFFFFF) else "#FF0000"
                 val updated = base.copy(
-                    triggerEnabled     = true,
-                    triggerSameAsPoint = true,
-                    triggerColor       = colorHex
+                    triggerEnabled = true,
+                    triggerColor   = colorHex
                 )
                 if (color == Int.MIN_VALUE) Toast.makeText(this, "색상 읽기 실패 (API 30+ 필요)", Toast.LENGTH_SHORT).show()
                 showAddPointDialog(updated)
@@ -377,9 +375,6 @@ class MainActivity : AppCompatActivity() {
         dialogBinding.cbTrigger.setOnCheckedChangeListener { _, checked ->
             dialogBinding.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
-        dialogBinding.cbTriggerSameAsPoint.setOnCheckedChangeListener { _, sameAsPoint ->
-            dialogBinding.groupTriggerCoords.visibility = if (!sameAsPoint) View.VISIBLE else View.GONE
-        }
         dialogBinding.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 dialogBinding.groupTriggerRetry.visibility = if (position == 1) View.VISIBLE else View.GONE
@@ -401,8 +396,7 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
-            dialogBinding.cbTriggerSameAsPoint.isChecked = prefill.triggerSameAsPoint
-            dialogBinding.groupTriggerCoords.visibility = if (!prefill.triggerSameAsPoint) View.VISIBLE else View.GONE
+            dialogBinding.groupTriggerCoords.visibility = View.VISIBLE
             dialogBinding.etTriggerX.setText(prefill.triggerX)
             dialogBinding.etTriggerY.setText(prefill.triggerY)
             if (prefill.triggerColor.isNotEmpty()) dialogBinding.etTriggerColor.setText(prefill.triggerColor)
@@ -513,12 +507,11 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val trigger = if (dialogBinding.cbTrigger.isChecked) {
-                    val sameAsPoint = dialogBinding.cbTriggerSameAsPoint.isChecked
-                    val cx = if (sameAsPoint) x else dialogBinding.etTriggerX.text?.toString()?.toIntOrNull()
-                    val cy = if (sameAsPoint) y else dialogBinding.etTriggerY.text?.toString()?.toIntOrNull()
+                    val cx = dialogBinding.etTriggerX.text?.toString()?.toIntOrNull()
+                    val cy = dialogBinding.etTriggerY.text?.toString()?.toIntOrNull()
                     val colorHex = dialogBinding.etTriggerColor.text?.toString()?.trim() ?: ""
                     val color = TriggerCondition.parseColor(colorHex)
-                    if (!sameAsPoint && (cx == null || cy == null)) {
+                    if (cx == null || cy == null) {
                         Toast.makeText(this, R.string.toast_trigger_need_coords, Toast.LENGTH_SHORT).show()
                         return@setPositiveButton
                     }
@@ -531,7 +524,7 @@ class MainActivity : AppCompatActivity() {
                     val action = if (actionPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                     val maxR = dialogBinding.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                     val rDelay = dialogBinding.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                    TriggerCondition(cx ?: x, cy ?: y, color, tol, action, maxR, rDelay, usePointCoords = sameAsPoint)
+                    TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
                 } else null
 
                 points.add(
@@ -571,9 +564,8 @@ class MainActivity : AppCompatActivity() {
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
-        triggerEnabled      = d.cbTrigger.isChecked,
-        triggerSameAsPoint  = d.cbTriggerSameAsPoint.isChecked,
-        triggerX            = d.etTriggerX.text?.toString().orEmpty(),
+        triggerEnabled = d.cbTrigger.isChecked,
+        triggerX       = d.etTriggerX.text?.toString().orEmpty(),
         triggerY       = d.etTriggerY.text?.toString().orEmpty(),
         triggerColor   = d.etTriggerColor.text?.toString().orEmpty(),
         triggerTolerance  = d.etTriggerTolerance.text?.toString().orEmpty(),
