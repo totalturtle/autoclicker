@@ -92,7 +92,14 @@ Android Accessibility Service를 활용한 자동 터치/클릭 앱
     - 색상 HEX 필드 옆 실시간 컬러 프리뷰 표시
     - API 30 미만 기기는 미지원 (Int.MIN_VALUE 취소 신호 처리)
   - 트리거 확인 위치와 탭 위치를 각각 다르게 설정 가능 (`cbTriggerSameAsPoint` 해제 시)
-- 특정 이미지/아이콘 인식 후 클릭 (OpenCV) — 미구현
+- **이미지 영역 비교 트리거** ✅ 구현됨 (빌트인 픽셀 비교, API 30+)
+  - 트리거 모드 스피너: "색상 픽셀" / "이미지 영역" 선택
+  - 기준 영역(X, Y, W, H) 지정 후 "기준 이미지 캡처" 버튼으로 레퍼런스 스크린샷 저장
+  - 실행 중 동일 영역을 실시간 캡처 → 픽셀 단위 비교 (허용 오차 + 매칭 임계값 % 설정)
+  - SKIP / WAIT_RETRY 모드 동일하게 지원
+  - 픽셀 데이터는 JSON(`rpx` 배열)에 직렬화하여 프로필과 함께 저장/로드
+  - OverlayService · MainActivity · PointSettingsActivity 모두 지원 (다이얼로그 dismiss→재오픈 흐름)
+- 텍스트 인식(OCR) 후 조건 분기 (ML Kit) — 미구현
 - 텍스트 인식(OCR) 후 조건 분기 (ML Kit) — 미구현
 
 ### 8. 화면 오버레이 UI ✅ 구현됨
@@ -164,7 +171,7 @@ Android Accessibility Service를 활용한 자동 터치/클릭 앱
 - **UI**: XML + ViewBinding
 - **서비스**: AccessibilityService, ForegroundService
 - **색상 감지**: AccessibilityService.takeScreenshot() (API 30+)
-- **이미지 인식**: 미구현 (OpenCV 검토)
+- **이미지 인식**: 빌트인 픽셀 비교 (API 30+) ✅ / OpenCV 템플릿 매칭 — 미구현
 - **OCR**: 미구현 (ML Kit 검토)
 - **저장**: SharedPreferences + JSON 파일 (SAF)
 - **테마**: AppCompatDelegate DayNight
@@ -249,6 +256,7 @@ Android Accessibility Service를 활용한 자동 터치/클릭 앱
 | 색상 피커 크래시 수정 | `canTakeScreenshot` 플래그 누락 수정, takeScreenshot() 동시 호출 방지 | ✅ 완료 |
 | 색상 트리거 버그수정 | HardwareBuffer 리소스 누수 수정 (try-finally), WAIT_RETRY 루프 색상 일치 시 즉시 탈출 (repeat→for+break) | ✅ 완료 |
 | 색상 피커 UX 개선 | 스포이트 위치 = 색상 체크 좌표 고정, "탭 위치도 동일하게" 토글 기본 OFF로 변경 | ✅ 완료 |
+| 이미지 영역 트리거 | 트리거 모드 스피너(색상 픽셀/이미지 영역), 기준 스크린샷 캡처·픽셀 비교, JSON 직렬화(`rpx`) | ✅ 완료 |
 
 ---
 
@@ -263,5 +271,6 @@ Android Accessibility Service를 활용한 자동 터치/클릭 앱
 ## 알려진 제한사항
 - 색상 감지는 Android 11(API 30) 이상에서만 동작
 - 드래그, 핀치 줌 제스처 미구현
-- 이미지/텍스트 인식 트리거 미구현
+- 이미지 영역 트리거는 빌트인 픽셀 비교 방식 (OpenCV 템플릿 매칭 미구현)
+- OCR 텍스트 인식 트리거 미구현
 - Play 스토어 미등록 상태 (사이드로드 설치 시 Play Protect 경고 발생)

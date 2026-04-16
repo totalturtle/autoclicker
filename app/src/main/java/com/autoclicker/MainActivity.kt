@@ -39,13 +39,17 @@ data class PointDialogState(
     val variance: String = "",
     val pointRepeat: String = "1",
     val triggerEnabled: Boolean = false,
+    val triggerModePos: Int = 0,
     val triggerX: String = "",
     val triggerY: String = "",
     val triggerColor: String = "#FF0000",
     val triggerTolerance: String = "20",
     val triggerActionPos: Int = 0,
     val triggerMaxRetries: String = "5",
-    val triggerRetryDelay: String = "500"
+    val triggerRetryDelay: String = "500",
+    val regionW: String = "",
+    val regionH: String = "",
+    val regionThreshold: String = "90"
 )
 
 /**
@@ -63,6 +67,12 @@ class MainActivity : AppCompatActivity() {
         @Volatile var pickCancelled: Boolean = false
         /** AutoClickAccessibilityService 가 색상 샘플 결과를 저장 */
         @Volatile var pickedColor: Triple<Int, Int, Int>? = null  // x, y, colorInt
+        /** AutoClickAccessibilityService 가 영역 캡처 결과를 저장 */
+        @Volatile var capturedRegionPixels: IntArray? = null
+        @Volatile var capturedRegionW: Int = 0
+        @Volatile var capturedRegionH: Int = 0
+        @Volatile var capturedRegionX: Int = 0
+        @Volatile var capturedRegionY: Int = 0
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -74,6 +84,8 @@ class MainActivity : AppCompatActivity() {
 
     /** 좌표 피커 실행 전 저장해 둔 다이얼로그 상태 (복귀 시 복원) */
     private var pendingDialogState: PointDialogState? = null
+    /** 영역 캡처 후 다이얼로그 재오픈 시 사용할 픽셀 데이터 */
+    private var pendingRegionPixelsForDialog: IntArray? = null
 
     private val profileManagerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -124,6 +136,17 @@ class MainActivity : AppCompatActivity() {
                     // onResume에서 처리되도록 앱이 이미 포그라운드에 있으면 직접 호출
                     handlePickedCoord()
                 }
+                AutoClickAccessibilityService.ACTION_REGION_CAPTURED -> {
+                    val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_REGION_TARGET) ?: return
+                    if (target != "main_region") return
+                    val pixels = intent.getIntArrayExtra(AutoClickAccessibilityService.EXTRA_REGION_PIXELS) ?: return
+                    capturedRegionPixels = pixels
+                    capturedRegionW = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_W, 0)
+                    capturedRegionH = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_H, 0)
+                    capturedRegionX = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_X, 0)
+                    capturedRegionY = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_Y, 0)
+                    handlePickedCoord()
+                }
             }
         }
     }
@@ -168,6 +191,29 @@ class MainActivity : AppCompatActivity() {
                 pendingDialogState?.let { showAddPointDialog(it) }
                 pendingDialogState = null
             }
+            capturedRegionPixels != null -> {
+                val pixels = capturedRegionPixels!!
+                val rw = capturedRegionW; val rh = capturedRegionH
+                val rx = capturedRegionX; val ry = capturedRegionY
+                capturedRegionPixels = null
+                val base = pendingDialogState ?: PointDialogState()
+                pendingDialogState = null
+                if (pixels.isNotEmpty()) {
+                    pendingRegionPixelsForDialog = pixels
+                    val updated = base.copy(
+                        triggerEnabled = true,
+                        triggerModePos = 1,
+                        triggerX = rx.toString(),
+                        triggerY = ry.toString(),
+                        regionW = rw.toString(),
+                        regionH = rh.toString()
+                    )
+                    showAddPointDialog(updated)
+                } else {
+                    Toast.makeText(this, "영역 캡처 실패 (API 30+ 필요)", Toast.LENGTH_SHORT).show()
+                    showAddPointDialog(base)
+                }
+            }
             pickedColor != null -> {
                 val (x, y, color) = pickedColor!!
                 pickedColor = null
@@ -211,10 +257,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun ensureOverlayServiceRunning() {
         if (!Settings.canDrawOverlays(this)) return
-        val json = readRawConfig().toJsonString()
-        startForegroundService(Intent(this, OverlayService::class.java).apply {
-            putExtra(OverlayService.EXTRA_SEQUENCE_JSON, json)
-        })
+        startForegroundService(Intent(this, OverlayService::class.java))
     }
 
     // ── UI 설정 ─────────────────────────────────────────────────────────
@@ -372,8 +415,17 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
 
+        fun applyTriggerModeUi(modePos: Int) {
+            dialogBinding.groupTriggerPixel.visibility  = if (modePos == 0) View.VISIBLE else View.GONE
+            dialogBinding.groupTriggerRegion.visibility = if (modePos == 1) View.VISIBLE else View.GONE
+            dialogBinding.groupTriggerCoords.visibility = if (modePos == 0) View.VISIBLE else View.GONE
+        }
+
         dialogBinding.cbTrigger.setOnCheckedChangeListener { _, checked ->
             dialogBinding.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+        dialogBinding.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
+            applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
         dialogBinding.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -381,6 +433,10 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
+
+        // 영역 캡처 결과 픽셀 (다이얼로그 저장용)
+        var regionPixelsForSave: IntArray? = pendingRegionPixelsForDialog
+        pendingRegionPixelsForDialog = null
 
         // 프리필 상태 적용
         if (prefill != null) {
@@ -396,19 +452,32 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
-            dialogBinding.groupTriggerCoords.visibility = View.VISIBLE
+            if (prefill.triggerModePos == 1) dialogBinding.rgTriggerMode.check(R.id.rbModeRegion)
+            else dialogBinding.rgTriggerMode.check(R.id.rbModePixel)
+            applyTriggerModeUi(prefill.triggerModePos)
             dialogBinding.etTriggerX.setText(prefill.triggerX)
             dialogBinding.etTriggerY.setText(prefill.triggerY)
             if (prefill.triggerColor.isNotEmpty()) dialogBinding.etTriggerColor.setText(prefill.triggerColor)
             if (prefill.triggerTolerance.isNotEmpty()) dialogBinding.etTriggerTolerance.setText(prefill.triggerTolerance)
             if (prefill.triggerMaxRetries.isNotEmpty()) dialogBinding.etTriggerMaxRetries.setText(prefill.triggerMaxRetries)
             if (prefill.triggerRetryDelay.isNotEmpty()) dialogBinding.etTriggerRetryDelay.setText(prefill.triggerRetryDelay)
+            if (prefill.regionW.isNotEmpty()) dialogBinding.etRegionW.setText(prefill.regionW)
+            if (prefill.regionH.isNotEmpty()) dialogBinding.etRegionH.setText(prefill.regionH)
+            if (prefill.regionThreshold.isNotEmpty()) dialogBinding.etRegionThreshold.setText(prefill.regionThreshold)
             dialogBinding.spinnerGesture.setSelection(prefill.gesturePos)
             dialogBinding.spinnerTriggerAction.setSelection(prefill.triggerActionPos)
             applyGestureUi(prefill.gesturePos)
             dialogBinding.groupTriggerRetry.visibility = if (prefill.triggerActionPos == 1) View.VISIBLE else View.GONE
         } else {
             applyGestureUi(0)
+            applyTriggerModeUi(0)
+        }
+
+        // 영역 캡처 픽셀이 있으면 상태 표시
+        if (regionPixelsForSave != null) {
+            val rw = prefill?.regionW?.toIntOrNull() ?: 0
+            val rh = prefill?.regionH?.toIntOrNull() ?: 0
+            dialogBinding.tvRegionCaptureStatus.text = "캡처됨: ${rw}×${rh}"
         }
 
         // 다이얼로그 참조 (피커 버튼에서 dismiss 용)
@@ -434,6 +503,17 @@ class MainActivity : AppCompatActivity() {
         }
         dialogBinding.btnPickColor.setOnClickListener {
             launchPicker(CoordPickerService.TARGET_COLOR)
+        }
+
+        // 영역 드래그 지정 버튼
+        dialogBinding.btnCaptureRegion.setOnClickListener {
+            pendingDialogState = captureDialogState(dialogBinding)
+            dialog?.dismiss()
+            dialog = null
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_REGION_CAPTURE)
+                putExtra(CoordPickerService.EXTRA_REGION_RESULT_TARGET, "main_region")
+            })
         }
 
         // 색상 HEX 입력 시 프리뷰 업데이트
@@ -509,14 +589,8 @@ class MainActivity : AppCompatActivity() {
                 val trigger = if (dialogBinding.cbTrigger.isChecked) {
                     val cx = dialogBinding.etTriggerX.text?.toString()?.toIntOrNull()
                     val cy = dialogBinding.etTriggerY.text?.toString()?.toIntOrNull()
-                    val colorHex = dialogBinding.etTriggerColor.text?.toString()?.trim() ?: ""
-                    val color = TriggerCondition.parseColor(colorHex)
                     if (cx == null || cy == null) {
                         Toast.makeText(this, R.string.toast_trigger_need_coords, Toast.LENGTH_SHORT).show()
-                        return@setPositiveButton
-                    }
-                    if (color == null) {
-                        Toast.makeText(this, R.string.toast_trigger_invalid_color, Toast.LENGTH_SHORT).show()
                         return@setPositiveButton
                     }
                     val tol = dialogBinding.etTriggerTolerance.text?.toString()?.toIntOrNull()?.coerceIn(0, 255) ?: 20
@@ -524,7 +598,28 @@ class MainActivity : AppCompatActivity() {
                     val action = if (actionPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                     val maxR = dialogBinding.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                     val rDelay = dialogBinding.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                    TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                    val modePos = if (dialogBinding.rbModeRegion.isChecked) 1 else 0
+                    if (modePos == 1) {
+                        // 이미지 영역 모드
+                        val rw = dialogBinding.etRegionW.text?.toString()?.toIntOrNull() ?: 0
+                        val rh = dialogBinding.etRegionH.text?.toString()?.toIntOrNull() ?: 0
+                        if (regionPixelsForSave == null) {
+                            Toast.makeText(this, "기준 이미지를 먼저 캡처하세요.", Toast.LENGTH_SHORT).show()
+                            return@setPositiveButton
+                        }
+                        val thr = (dialogBinding.etRegionThreshold.text?.toString()?.toIntOrNull() ?: 90).coerceIn(0, 100) / 100f
+                        TriggerCondition(cx, cy, 0, tol, action, maxR, rDelay,
+                            mode = TriggerMode.REGION, regionW = rw, regionH = rh,
+                            regionPixels = regionPixelsForSave, regionMatchThreshold = thr)
+                    } else {
+                        // 색상 픽셀 모드
+                        val color = TriggerCondition.parseColor(dialogBinding.etTriggerColor.text?.toString()?.trim() ?: "")
+                        if (color == null) {
+                            Toast.makeText(this, R.string.toast_trigger_invalid_color, Toast.LENGTH_SHORT).show()
+                            return@setPositiveButton
+                        }
+                        TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                    }
                 } else null
 
                 points.add(
@@ -564,14 +659,18 @@ class MainActivity : AppCompatActivity() {
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
-        triggerEnabled = d.cbTrigger.isChecked,
-        triggerX       = d.etTriggerX.text?.toString().orEmpty(),
-        triggerY       = d.etTriggerY.text?.toString().orEmpty(),
-        triggerColor   = d.etTriggerColor.text?.toString().orEmpty(),
+        triggerEnabled    = d.cbTrigger.isChecked,
+        triggerModePos    = if (d.rbModeRegion.isChecked) 1 else 0,
+        triggerX          = d.etTriggerX.text?.toString().orEmpty(),
+        triggerY          = d.etTriggerY.text?.toString().orEmpty(),
+        triggerColor      = d.etTriggerColor.text?.toString().orEmpty(),
         triggerTolerance  = d.etTriggerTolerance.text?.toString().orEmpty(),
         triggerActionPos  = d.spinnerTriggerAction.selectedItemPosition,
         triggerMaxRetries = d.etTriggerMaxRetries.text?.toString().orEmpty(),
-        triggerRetryDelay = d.etTriggerRetryDelay.text?.toString().orEmpty()
+        triggerRetryDelay = d.etTriggerRetryDelay.text?.toString().orEmpty(),
+        regionW           = d.etRegionW.text?.toString().orEmpty(),
+        regionH           = d.etRegionH.text?.toString().orEmpty(),
+        regionThreshold   = d.etRegionThreshold.text?.toString().orEmpty()
     )
 
     // ── 시퀀스 로드/저장 ────────────────────────────────────────────────
@@ -744,6 +843,7 @@ class MainActivity : AppCompatActivity() {
             addAction(AutoClickAccessibilityService.ACTION_STARTED)
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
             addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
+            addAction(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)

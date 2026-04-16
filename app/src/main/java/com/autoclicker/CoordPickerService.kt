@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
@@ -33,8 +34,10 @@ class CoordPickerService : Service() {
         const val TARGET_END           = "end"
         const val TARGET_TRIGGER       = "trigger"
         const val TARGET_OVERLAY_ADD   = "overlay_add"
-        const val TARGET_COLOR         = "color"
-        const val TARGET_OVERLAY_COLOR = "overlay_color"
+        const val TARGET_COLOR           = "color"
+        const val TARGET_OVERLAY_COLOR   = "overlay_color"
+        const val TARGET_REGION_CAPTURE  = "region_capture"
+        const val EXTRA_REGION_RESULT_TARGET = "region_result_target"
 
         const val ACTION_OVERLAY_COORD_PICKED = "com.autoclicker.OVERLAY_COORD_PICKED"
         const val EXTRA_PICKED_X = "picked_x"
@@ -49,10 +52,13 @@ class CoordPickerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val target = intent?.getStringExtra(EXTRA_PICK_TARGET) ?: TARGET_START
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        if (target == TARGET_COLOR || target == TARGET_OVERLAY_COLOR) {
-            showDropperPicker(target)
-        } else {
-            showTapPicker(target)
+        when {
+            target == TARGET_COLOR || target == TARGET_OVERLAY_COLOR -> showDropperPicker(target)
+            target == TARGET_REGION_CAPTURE -> {
+                val resultTarget = intent?.getStringExtra(EXTRA_REGION_RESULT_TARGET) ?: "overlay_region"
+                showRegionPicker(resultTarget)
+            }
+            else -> showTapPicker(target)
         }
         return START_NOT_STICKY
     }
@@ -276,6 +282,176 @@ class CoordPickerService : Service() {
 
         @Suppress("DEPRECATION")
         private fun sp(v: Float) = v * resources.displayMetrics.scaledDensity
+    }
+
+    // ── 이미지 영역 드래그 선택 모드 ──────────────────────────────────────
+
+    private fun showRegionPicker(resultTarget: String) {
+        val rootView = FrameLayout(this)
+
+        val regionView = RegionSelectView(this) { x, y, w, h ->
+            dismiss()
+            sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_REQUEST_REGION_CAPTURE).apply {
+                setPackage(packageName)
+                putExtra(AutoClickAccessibilityService.EXTRA_REGION_X, x)
+                putExtra(AutoClickAccessibilityService.EXTRA_REGION_Y, y)
+                putExtra(AutoClickAccessibilityService.EXTRA_REGION_W, w)
+                putExtra(AutoClickAccessibilityService.EXTRA_REGION_H, h)
+                putExtra(AutoClickAccessibilityService.EXTRA_REGION_TARGET, resultTarget)
+            })
+            if (resultTarget == "main_region") bringAppToFront()
+            stopSelf()
+        }
+
+        val cancelBtn = Button(this).apply {
+            text = "취소"
+            setBackgroundColor(0xDD1A1A2E.toInt())
+            setTextColor(Color.WHITE)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setOnClickListener {
+                dismiss()
+                // 빈 pixels 로 취소 신호 → 각 수신자가 원래 다이얼로그 복원
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_REGION_CAPTURED).apply {
+                    setPackage(packageName)
+                    putExtra(AutoClickAccessibilityService.EXTRA_REGION_TARGET, resultTarget)
+                    putExtra(AutoClickAccessibilityService.EXTRA_REGION_PIXELS, IntArray(0))
+                    putExtra(AutoClickAccessibilityService.EXTRA_REGION_W, 0)
+                    putExtra(AutoClickAccessibilityService.EXTRA_REGION_H, 0)
+                })
+                if (resultTarget == "main_region") bringAppToFront()
+                stopSelf()
+            }
+        }
+
+        rootView.addView(regionView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        rootView.addView(cancelBtn, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.END
+        ).also { it.topMargin = dp(48); it.marginEnd = dp(16) })
+
+        wm.addView(rootView, overlayParams())
+        root = rootView
+    }
+
+    private inner class RegionSelectView(
+        ctx: android.content.Context,
+        private val onRegionSelected: (x: Int, y: Int, w: Int, h: Int) -> Unit
+    ) : View(ctx) {
+
+        private var startX = 0f
+        private var startY = 0f
+        private var curX   = 0f
+        private var curY   = 0f
+        private var isSelecting = false
+
+        private val MAX_PX = 300  // 최대 캡처 크기 (픽셀)
+
+        private val dimPaint = Paint().apply { color = Color.argb(160, 0, 0, 0) }
+        private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            pathEffect = DashPathEffect(floatArrayOf(20f, 10f), 0f)
+        }
+        private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        private val sizePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        private val instructPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+        }
+        private val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFAAAAAA.toInt()
+            textAlign = Paint.Align.CENTER
+        }
+        private val chipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xEE111827.toInt()
+            style = Paint.Style.FILL
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = event.x; startY = event.y
+                    curX   = event.x; curY   = event.y
+                    isSelecting = true; invalidate()
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    curX = event.x; curY = event.y; invalidate()
+                }
+                MotionEvent.ACTION_UP -> {
+                    curX = event.x; curY = event.y
+                    isSelecting = false; invalidate()
+                    val left  = minOf(startX, curX).toInt().coerceAtLeast(0)
+                    val top   = minOf(startY, curY).toInt().coerceAtLeast(0)
+                    val right = maxOf(startX, curX).toInt()
+                    val bottom = maxOf(startY, curY).toInt()
+                    val w = (right - left).coerceAtMost(MAX_PX)
+                    val h = (bottom - top).coerceAtMost(MAX_PX)
+                    if (w > 10 && h > 10) onRegionSelected(left, top, w, h)
+                }
+            }
+            return true
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val vw = width.toFloat()
+            val vh = height.toFloat()
+            val density = resources.displayMetrics.density
+
+            if (!isSelecting) {
+                canvas.drawRect(0f, 0f, vw, vh, dimPaint)
+                instructPaint.textSize = 18f * density
+                canvas.drawText("드래그하여 비교 영역을 지정하세요", vw / 2f, vh * 0.12f, instructPaint)
+                subPaint.textSize = 13f * density
+                canvas.drawText("손을 떼면 해당 영역이 캡처됩니다 (최대 ${MAX_PX}×${MAX_PX}px)",
+                    vw / 2f, vh * 0.12f + 32f * density, subPaint)
+                return
+            }
+
+            val left   = minOf(startX, curX)
+            val top    = minOf(startY, curY)
+            val right  = maxOf(startX, curX)
+            val bottom = maxOf(startY, curY)
+
+            // 선택 영역 바깥 어두운 오버레이 (4분할)
+            canvas.drawRect(0f, 0f, vw, top, dimPaint)
+            canvas.drawRect(0f, bottom, vw, vh, dimPaint)
+            canvas.drawRect(0f, top, left, bottom, dimPaint)
+            canvas.drawRect(right, top, vw, bottom, dimPaint)
+
+            // 선택 테두리 (점선)
+            canvas.drawRect(left, top, right, bottom, borderPaint)
+
+            // 모서리 핸들
+            val h = 10f * density
+            for ((cx, cy) in listOf(left to top, right to top, left to bottom, right to bottom)) {
+                canvas.drawRect(cx - h, cy - h, cx + h, cy + h, cornerPaint)
+            }
+
+            // 크기 표시 칩 (선택 영역 중앙)
+            val selW = (right - left).toInt().coerceAtMost(MAX_PX)
+            val selH = (bottom - top).toInt().coerceAtMost(MAX_PX)
+            val sizeText = "${selW}×${selH}px"
+            sizePaint.textSize = 14f * density
+            val chipW = sizePaint.measureText(sizeText) + 24f * density
+            val chipH = 28f * density
+            val cx = (left + right) / 2f
+            val cy = (top + bottom) / 2f
+            canvas.drawRoundRect(
+                RectF(cx - chipW / 2, cy - chipH / 2, cx + chipW / 2, cy + chipH / 2),
+                8f * density, 8f * density, chipPaint
+            )
+            canvas.drawText(sizeText, cx, cy + 5f * density, sizePaint)
+        }
     }
 
     // ── 일반 탭 피커 모드 ─────────────────────────────────────────────────

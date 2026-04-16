@@ -9,4 +9,8 @@
         <item>스킵</item>
         <item>재시도 후 스킵</item>
     </string-array>
+    <string-array name="trigger_mode_labels">
+        <item>색상 픽셀</item>
+        <item>이미지 영역</item>
+    </string-array>
 </resources>

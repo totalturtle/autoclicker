@@ -68,6 +68,15 @@ data class ClickSequenceConfig(
                             put("act", p.trigger.action.name)
                             put("maxR", p.trigger.maxRetries)
                             put("rDelay", p.trigger.retryDelayMs)
+                            if (p.trigger.mode == TriggerMode.REGION) {
+                                put("tmode", "region")
+                                put("rw", p.trigger.regionW)
+                                put("rh", p.trigger.regionH)
+                                put("rthr", p.trigger.regionMatchThreshold.toDouble())
+                                p.trigger.regionPixels?.let { px ->
+                                    put("rpx", JSONArray().also { a -> px.forEach { a.put(it) } })
+                                }
+                            }
                         })
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
@@ -101,6 +110,11 @@ data class ClickSequenceConfig(
                         val gesture = GestureType.fromJsonKey(o.optString("g", "tap"))
                         val trigger = if (o.has("trigger")) runCatching {
                             val t = o.getJSONObject("trigger")
+                            val tmode = if (t.optString("tmode") == "region") TriggerMode.REGION else TriggerMode.PIXEL
+                            val regionPixels = if (tmode == TriggerMode.REGION && t.has("rpx")) {
+                                val arr = t.getJSONArray("rpx")
+                                IntArray(arr.length()) { i -> arr.getInt(i) }
+                            } else null
                             TriggerCondition(
                                 checkX = t.getInt("cx"),
                                 checkY = t.getInt("cy"),
@@ -108,7 +122,12 @@ data class ClickSequenceConfig(
                                 tolerance = t.optInt("tol", 20),
                                 action = TriggerAction.valueOf(t.optString("act", TriggerAction.SKIP.name)),
                                 maxRetries = t.optInt("maxR", 5),
-                                retryDelayMs = t.optLong("rDelay", 500L)
+                                retryDelayMs = t.optLong("rDelay", 500L),
+                                mode = tmode,
+                                regionW = t.optInt("rw", 0),
+                                regionH = t.optInt("rh", 0),
+                                regionPixels = regionPixels,
+                                regionMatchThreshold = t.optDouble("rthr", 0.9).toFloat()
                             )
                         }.getOrNull() else null
                         add(

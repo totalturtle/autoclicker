@@ -22,6 +22,35 @@ class PointSettingsActivity : AppCompatActivity() {
         const val ACTION_POINT_UPDATED = "com.autoclicker.POINT_UPDATED"
     }
 
+    private var capturingRegion = false
+    private var capturedRegionPixels: IntArray? = null
+    private var capturedRegionX = 0
+    private var capturedRegionY = 0
+    private var capturedRegionW = 0
+    private var capturedRegionH = 0
+    private var capturingRegionIndex = -1
+
+    private val regionCaptureReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+            if (intent.action != AutoClickAccessibilityService.ACTION_REGION_CAPTURED) return
+            val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_REGION_TARGET) ?: return
+            if (target != "settings_region") return
+            val pixels = intent.getIntArrayExtra(AutoClickAccessibilityService.EXTRA_REGION_PIXELS) ?: return
+            capturedRegionPixels = if (pixels.isNotEmpty()) pixels else null
+            capturedRegionX = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_X, 0)
+            capturedRegionY = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_Y, 0)
+            capturedRegionW = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_W, 0)
+            capturedRegionH = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_H, 0)
+            capturingRegion = false
+            // 다이얼로그 재오픈
+            val idx = capturingRegionIndex
+            if (idx < 0) return
+            val cfg = SequencePrefs.load(this@PointSettingsActivity) ?: return
+            if (idx >= cfg.points.size) return
+            showSettingsDialog(idx, cfg.points[idx], cfg)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -31,7 +60,19 @@ class PointSettingsActivity : AppCompatActivity() {
         val cfg = SequencePrefs.load(this)
         if (cfg == null || index >= cfg.points.size) { finish(); return }
 
+        val filter = android.content.IntentFilter(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(regionCaptureReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(regionCaptureReceiver, filter)
+        }
+
         showSettingsDialog(index, cfg.points[index], cfg)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        runCatching { unregisterReceiver(regionCaptureReceiver) }
     }
 
     private fun showSettingsDialog(index: Int, point: ClickPoint, cfg: ClickSequenceConfig) {
@@ -42,6 +83,13 @@ class PointSettingsActivity : AppCompatActivity() {
         d.btnPickEnd.visibility     = View.GONE
         d.btnPickTrigger.visibility = View.GONE
         d.btnPickColor.visibility   = View.GONE
+
+        // 트리거 모드 UI 토글
+        fun applyTriggerModeUi(modePos: Int) {
+            d.groupTriggerPixel.visibility  = if (modePos == 0) View.VISIBLE else View.GONE
+            d.groupTriggerRegion.visibility = if (modePos == 1) View.VISIBLE else View.GONE
+            d.groupTriggerCoords.visibility = if (modePos == 0) View.VISIBLE else View.GONE
+        }
 
         // 현재 포인트 값으로 채우기
         d.etDialogX.setText(point.x.toString())
@@ -79,21 +127,59 @@ class PointSettingsActivity : AppCompatActivity() {
             d.etDialogLongDur.setText(point.longPressDurationMs.toString())
         }
 
+        // 현재 포인트 트리거값 + 캡처된 픽셀 데이터
+        var regionPixelsForSave: IntArray? = capturedRegionPixels
         val trigger = point.trigger
         if (trigger != null) {
             d.cbTrigger.isChecked    = true
             d.groupTrigger.visibility = View.VISIBLE
-            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(trigger.checkX.toString())
             d.etTriggerY.setText(trigger.checkY.toString())
             d.etTriggerTolerance.setText(trigger.tolerance.toString())
             d.etTriggerMaxRetries.setText(trigger.maxRetries.toString())
             d.etTriggerRetryDelay.setText(trigger.retryDelayMs.toString())
-            val colorHex = "#%06X".format(trigger.targetColor and 0xFFFFFF)
-            d.etTriggerColor.setText(colorHex)
             val actionPos = if (trigger.action == TriggerAction.WAIT_RETRY) 1 else 0
             d.spinnerTriggerAction.setSelection(actionPos)
             d.groupTriggerRetry.visibility = if (actionPos == 1) View.VISIBLE else View.GONE
+            when (trigger.mode) {
+                TriggerMode.REGION -> {
+                    d.rgTriggerMode.check(R.id.rbModeRegion)
+                    applyTriggerModeUi(1)
+                    d.etRegionW.setText(trigger.regionW.toString())
+                    d.etRegionH.setText(trigger.regionH.toString())
+                    d.etRegionThreshold.setText((trigger.regionMatchThreshold * 100).toInt().toString())
+                    val existingPixels = trigger.regionPixels
+                    if (regionPixelsForSave == null) regionPixelsForSave = existingPixels
+                    d.tvRegionCaptureStatus.text = if (regionPixelsForSave != null) {
+                        val cx = capturedRegionX.takeIf { capturedRegionW > 0 } ?: trigger.checkX
+                        val cy = capturedRegionY.takeIf { capturedRegionW > 0 } ?: trigger.checkY
+                        val rw = capturedRegionW.takeIf { it > 0 } ?: trigger.regionW
+                        val rh = capturedRegionH.takeIf { it > 0 } ?: trigger.regionH
+                        "캡처됨: ($cx,$cy) ${rw}×${rh}px"
+                    } else "캡처 없음"
+                }
+                TriggerMode.PIXEL -> {
+                    d.rgTriggerMode.check(R.id.rbModePixel)
+                    applyTriggerModeUi(0)
+                    d.etTriggerColor.setText("#%06X".format(trigger.targetColor and 0xFFFFFF))
+                }
+            }
+        } else {
+            applyTriggerModeUi(0)
+        }
+        // 캡처 결과가 새로 왔으면 영역 모드로 전환
+        if (capturedRegionPixels != null) {
+            d.cbTrigger.isChecked = true
+            d.groupTrigger.visibility = View.VISIBLE
+            d.rgTriggerMode.check(R.id.rbModeRegion)
+            applyTriggerModeUi(1)
+            // 드래그 선택 결과로 좌표/크기 자동 설정
+            d.etTriggerX.setText(capturedRegionX.toString())
+            d.etTriggerY.setText(capturedRegionY.toString())
+            d.etRegionW.setText(capturedRegionW.toString())
+            d.etRegionH.setText(capturedRegionH.toString())
+            d.tvRegionCaptureStatus.text = "캡처됨: (${capturedRegionX},${capturedRegionY}) ${capturedRegionW}×${capturedRegionH}px"
+            capturedRegionPixels = null  // 소비 완료
         }
 
         // 기존 색상값 프리뷰 표시
@@ -111,6 +197,9 @@ class PointSettingsActivity : AppCompatActivity() {
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
+        d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
+            applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
+        }
         d.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 d.groupTriggerRetry.visibility = if (position == 1) View.VISIBLE else View.GONE
@@ -118,17 +207,30 @@ class PointSettingsActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
 
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle("포인트 #${index + 1} 설정")
             .setView(d.root)
             .setNeutralButton("삭제") { _, _ -> deletePoint(index, cfg) }
             .setNegativeButton("취소", null)
-            .setPositiveButton("확인") { _, _ -> savePoint(index, d, point, cfg) }
-            .setOnDismissListener { finish() }
-            .show()
+            .setPositiveButton("확인") { _, _ -> savePoint(index, d, point, cfg, regionPixelsForSave) }
+            .create()
+
+        // 영역 드래그 지정 버튼
+        d.btnCaptureRegion.setOnClickListener {
+            capturingRegion = true
+            capturingRegionIndex = index
+            dialog.dismiss()
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_REGION_CAPTURE)
+                putExtra(CoordPickerService.EXTRA_REGION_RESULT_TARGET, "settings_region")
+            })
+        }
+
+        dialog.setOnDismissListener { if (!capturingRegion) finish() }
+        dialog.show()
     }
 
-    private fun savePoint(index: Int, d: DialogAddPointBinding, original: ClickPoint, cfg: ClickSequenceConfig) {
+    private fun savePoint(index: Int, d: DialogAddPointBinding, original: ClickPoint, cfg: ClickSequenceConfig, regionPixels: IntArray? = null) {
         val gesturePos = d.spinnerGesture.selectedItemPosition
         val gesture = when (gesturePos) {
             1    -> GestureType.LONG_PRESS
@@ -167,17 +269,29 @@ class PointSettingsActivity : AppCompatActivity() {
         }
 
         val newTrigger = if (d.cbTrigger.isChecked) {
-            val cx    = d.etTriggerX.text?.toString()?.toIntOrNull()
-            val cy    = d.etTriggerY.text?.toString()?.toIntOrNull()
-            val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
-            if (cx == null || cy == null || color == null) { original.trigger }
+            val cx = d.etTriggerX.text?.toString()?.toIntOrNull()
+            val cy = d.etTriggerY.text?.toString()?.toIntOrNull()
+            if (cx == null || cy == null) { original.trigger }
             else {
                 val tol    = d.etTriggerTolerance.text?.toString()?.toIntOrNull()?.coerceIn(0, 255) ?: 20
                 val actPos = d.spinnerTriggerAction.selectedItemPosition
                 val action = if (actPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                 val maxR   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                 val rDelay = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                val modePos = if (d.rbModeRegion.isChecked) 1 else 0
+                if (modePos == 1) {
+                    val rw  = d.etRegionW.text?.toString()?.toIntOrNull() ?: 0
+                    val rh  = d.etRegionH.text?.toString()?.toIntOrNull() ?: 0
+                    val thr = (d.etRegionThreshold.text?.toString()?.toIntOrNull() ?: 90).coerceIn(0, 100) / 100f
+                    val px  = regionPixels ?: original.trigger?.takeIf { it.mode == TriggerMode.REGION }?.regionPixels
+                    TriggerCondition(cx, cy, 0, tol, action, maxR, rDelay,
+                        mode = TriggerMode.REGION, regionW = rw, regionH = rh,
+                        regionPixels = px, regionMatchThreshold = thr)
+                } else {
+                    val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
+                    if (color == null) original.trigger
+                    else TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                }
             }
         } else null
 

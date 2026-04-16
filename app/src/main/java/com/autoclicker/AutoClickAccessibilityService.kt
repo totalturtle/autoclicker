@@ -33,6 +33,8 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val ACTION_AUTO_PROFILE = "com.autoclicker.ACTION_AUTO_PROFILE"
         const val ACTION_REQUEST_COLOR_SAMPLE = "com.autoclicker.REQUEST_COLOR_SAMPLE"
         const val ACTION_COLOR_SAMPLED = "com.autoclicker.COLOR_SAMPLED"
+        const val ACTION_REQUEST_REGION_CAPTURE = "com.autoclicker.REQUEST_REGION_CAPTURE"
+        const val ACTION_REGION_CAPTURED = "com.autoclicker.REGION_CAPTURED"
 
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
         const val EXTRA_COUNT = "extra_count"
@@ -42,6 +44,12 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val EXTRA_SAMPLE_TARGET = "sample_target"
         const val EXTRA_SAMPLED_COLOR = "sampled_color"
         const val EXTRA_MOVE_TO_DROPPER = "move_to_dropper"
+        const val EXTRA_REGION_X = "region_x"
+        const val EXTRA_REGION_Y = "region_y"
+        const val EXTRA_REGION_W = "region_w"
+        const val EXTRA_REGION_H = "region_h"
+        const val EXTRA_REGION_TARGET = "region_target"
+        const val EXTRA_REGION_PIXELS = "region_pixels"
 
         var instance: AutoClickAccessibilityService? = null
             private set
@@ -62,8 +70,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 ACTION_START -> {
-                    val json = intent.getStringExtra(EXTRA_SEQUENCE_JSON)
-                    val config = ClickSequenceConfig.fromJsonString(json) ?: return
+                    val config = SequencePrefs.load(this@AutoClickAccessibilityService) ?: return
                     startClicking(config)
                 }
                 ACTION_STOP -> stopClicking()
@@ -74,6 +81,14 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     val target = intent.getStringExtra(EXTRA_SAMPLE_TARGET) ?: return
                     val move = intent.getBooleanExtra(EXTRA_MOVE_TO_DROPPER, false)
                     serviceScope.launch { sampleColor(x, y, target, move) }
+                }
+                ACTION_REQUEST_REGION_CAPTURE -> {
+                    val rx = intent.getIntExtra(EXTRA_REGION_X, 0)
+                    val ry = intent.getIntExtra(EXTRA_REGION_Y, 0)
+                    val rw = intent.getIntExtra(EXTRA_REGION_W, 0)
+                    val rh = intent.getIntExtra(EXTRA_REGION_H, 0)
+                    val target = intent.getStringExtra(EXTRA_REGION_TARGET) ?: return
+                    serviceScope.launch { captureRegion(rx, ry, rw, rh, target) }
                 }
             }
         }
@@ -88,6 +103,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
             addAction(ACTION_STOP)
             addAction(ACTION_TOGGLE)
             addAction(ACTION_REQUEST_COLOR_SAMPLE)
+            addAction(ACTION_REQUEST_REGION_CAPTURE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(commandReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -206,7 +222,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
     private suspend fun performPoint(p: ClickPoint): Boolean {
         val trigger = p.trigger
         if (trigger != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val matched = checkColorTrigger(trigger)
+            val matched = checkTrigger(trigger)
             if (!matched) {
                 when (trigger.action) {
                     TriggerAction.SKIP -> return false
@@ -214,7 +230,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
                         var found = false
                         for (i in 0 until trigger.maxRetries) {
                             delay(trigger.retryDelayMs)
-                            if (checkColorTrigger(trigger)) { found = true; break }
+                            if (checkTrigger(trigger)) { found = true; break }
                         }
                         if (!found) return false
                     }
@@ -242,7 +258,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    private suspend fun checkColorTrigger(trigger: TriggerCondition): Boolean =
+    private suspend fun checkTrigger(trigger: TriggerCondition): Boolean =
         suspendCancellableCoroutine { cont ->
             takeScreenshot(
                 Display.DEFAULT_DISPLAY,
@@ -254,10 +270,16 @@ class AutoClickAccessibilityService : AccessibilityService() {
                             try {
                                 val swBmp = hwBmp?.copy(Bitmap.Config.ARGB_8888, false)
                                 try {
-                                    val x = trigger.checkX.coerceIn(0, (swBmp?.width ?: 1) - 1)
-                                    val y = trigger.checkY.coerceIn(0, (swBmp?.height ?: 1) - 1)
-                                    val pixel = swBmp?.getPixel(x, y) ?: android.graphics.Color.TRANSPARENT
-                                    TriggerCondition.colorMatches(pixel, trigger.targetColor, trigger.tolerance)
+                                    if (swBmp == null) return@runCatching false
+                                    when (trigger.mode) {
+                                        TriggerMode.REGION -> trigger.regionMatches(swBmp)
+                                        TriggerMode.PIXEL -> {
+                                            val x = trigger.checkX.coerceIn(0, swBmp.width - 1)
+                                            val y = trigger.checkY.coerceIn(0, swBmp.height - 1)
+                                            val pixel = swBmp.getPixel(x, y)
+                                            TriggerCondition.colorMatches(pixel, trigger.targetColor, trigger.tolerance)
+                                        }
+                                    }
                                 } finally {
                                     swBmp?.recycle()
                                 }
@@ -276,6 +298,67 @@ class AutoClickAccessibilityService : AccessibilityService() {
                 }
             )
         }
+
+    private suspend fun captureRegion(x: Int, y: Int, w: Int, h: Int, target: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            sendBroadcast(Intent(ACTION_REGION_CAPTURED).apply {
+                setPackage(packageName)
+                putExtra(EXTRA_REGION_TARGET, target)
+                putExtra(EXTRA_REGION_PIXELS, IntArray(0))
+                putExtra(EXTRA_REGION_W, 0)
+                putExtra(EXTRA_REGION_H, 0)
+            })
+            return
+        }
+        delay(600L) // 다이얼로그가 완전히 닫힌 후 캡처
+        @Suppress("NewApi")
+        suspendCancellableCoroutine<Unit> { cont ->
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                ContextCompat.getMainExecutor(this@AutoClickAccessibilityService),
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        val (pixels, rw, rh) = runCatching {
+                            val hwBmp = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                            val swBmp = hwBmp?.copy(Bitmap.Config.ARGB_8888, false)
+                            hwBmp?.recycle()
+                            result.hardwareBuffer.close()
+                            val bw = swBmp?.width ?: 0
+                            val bh = swBmp?.height ?: 0
+                            val cx = x.coerceIn(0, (bw - 1).coerceAtLeast(0))
+                            val cy = y.coerceIn(0, (bh - 1).coerceAtLeast(0))
+                            val cw = w.coerceAtMost(bw - cx).coerceAtLeast(1)
+                            val ch = h.coerceAtMost(bh - cy).coerceAtLeast(1)
+                            val arr = IntArray(cw * ch)
+                            swBmp?.getPixels(arr, 0, cw, cx, cy, cw, ch)
+                            swBmp?.recycle()
+                            Triple(arr, cw, ch)
+                        }.getOrDefault(Triple(IntArray(0), 0, 0))
+                        sendBroadcast(Intent(ACTION_REGION_CAPTURED).apply {
+                            setPackage(packageName)
+                            putExtra(EXTRA_REGION_TARGET, target)
+                            putExtra(EXTRA_REGION_X, x)
+                            putExtra(EXTRA_REGION_Y, y)
+                            putExtra(EXTRA_REGION_W, rw)
+                            putExtra(EXTRA_REGION_H, rh)
+                            putExtra(EXTRA_REGION_PIXELS, pixels)
+                        })
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                    override fun onFailure(errorCode: Int) {
+                        sendBroadcast(Intent(ACTION_REGION_CAPTURED).apply {
+                            setPackage(packageName)
+                            putExtra(EXTRA_REGION_TARGET, target)
+                            putExtra(EXTRA_REGION_PIXELS, IntArray(0))
+                            putExtra(EXTRA_REGION_W, 0)
+                            putExtra(EXTRA_REGION_H, 0)
+                        })
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+                }
+            )
+        }
+    }
 
     private suspend fun sampleColor(x: Int, y: Int, target: String, moveToDropper: Boolean = false) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {

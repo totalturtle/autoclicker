@@ -59,8 +59,20 @@ class OverlayService : Service() {
     private var isEditMode            = false
     private var isDialogShowing       = false
     private var pendingColorPickIndex = -1
+    private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
     private var markersVisible        = true
+
+    // 영역 캡처 대기 중 다이얼로그 상태 임시 저장
+    private var pendingRegionX = 0
+    private var pendingRegionY = 0
+    private var pendingRegionW = 0
+    private var pendingRegionH = 0
+    private var pendingRegionThresholdPct = 90
+    private var pendingRegionActionPos = 0
+    private var pendingRegionTolerance = 20
+    private var pendingRegionMaxRetries = 5
+    private var pendingRegionRetryDelayMs = 500L
 
     /** 드래그 가능한 마커 목록 */
     private data class MarkerEntry(val view: View, val params: WindowManager.LayoutParams)
@@ -107,6 +119,20 @@ class OverlayService : Service() {
                         dropperY = if (move) y else null
                     )
                 }
+                AutoClickAccessibilityService.ACTION_REGION_CAPTURED -> {
+                    val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_REGION_TARGET) ?: return
+                    if (target != "overlay_region") return
+                    val pixels = intent.getIntArrayExtra(AutoClickAccessibilityService.EXTRA_REGION_PIXELS) ?: return
+                    val idx = pendingRegionPickIndex
+                    pendingRegionPickIndex = -1
+                    if (idx >= 0 && pixels.isNotEmpty()) {
+                        pendingRegionX = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_X, 0)
+                        pendingRegionY = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_Y, 0)
+                        pendingRegionW = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_W, 0)
+                        pendingRegionH = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_REGION_H, 0)
+                        openPointSettings(idx, capturedRegionPixels = pixels)
+                    }
+                }
             }
         }
     }
@@ -128,6 +154,7 @@ class OverlayService : Service() {
             addAction(AutoClickAccessibilityService.ACTION_STOP)
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
             addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
+            addAction(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
             addAction(ACTION_TOGGLE_MARKERS)
         }
@@ -138,10 +165,7 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        intent?.getStringExtra(EXTRA_SEQUENCE_JSON)?.let {
-            sequenceJson = it
-            refreshMarkers()
-        }
+        refreshMarkers()
         return START_STICKY
     }
 
@@ -207,11 +231,10 @@ class OverlayService : Service() {
                             AutoClickAccessibilityService.instance?.requestStop()
                                 ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
                         } else {
-                            val json = SequencePrefs.loadRawJson(this) ?: sequenceJson
-                            if (json != null) {
+                            val cfg = SequencePrefs.load(this)
+                            if (cfg != null && cfg.points.isNotEmpty()) {
                                 sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
                                     setPackage(packageName)
-                                    putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
                                 })
                             }
                         }
@@ -541,7 +564,7 @@ class OverlayService : Service() {
         }
     }
 
-    private fun openPointSettings(index: Int, pickedColor: Int? = null, triggerCheckX: Int? = null, triggerCheckY: Int? = null, dropperX: Int? = null, dropperY: Int? = null) {
+    private fun openPointSettings(index: Int, pickedColor: Int? = null, triggerCheckX: Int? = null, triggerCheckY: Int? = null, dropperX: Int? = null, dropperY: Int? = null, capturedRegionPixels: IntArray? = null) {
         if (isDialogShowing) return  // 연쇄 오픈 방지
         val cfg = SequencePrefs.load(this) ?: return
         if (index >= cfg.points.size) return
@@ -603,40 +626,91 @@ class OverlayService : Service() {
             d.etDialogLongDur.setText(point.longPressDurationMs.toString())
         }
 
+        // 트리거 모드 UI 토글 헬퍼
+        fun applyTriggerModeUi(modePos: Int) {
+            d.groupTriggerPixel.visibility  = if (modePos == 0) View.VISIBLE else View.GONE
+            d.groupTriggerRegion.visibility = if (modePos == 1) View.VISIBLE else View.GONE
+            d.groupTriggerCoords.visibility = if (modePos == 0) View.VISIBLE else View.GONE
+        }
+
+        // 현재 포인트의 트리거 값으로 채우기
+        var regionPixelsForSave: IntArray? = null
         val trigger = point.trigger
         if (trigger != null) {
             d.cbTrigger.isChecked    = true
             d.groupTrigger.visibility = View.VISIBLE
-            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(trigger.checkX.toString())
             d.etTriggerY.setText(trigger.checkY.toString())
             d.etTriggerTolerance.setText(trigger.tolerance.toString())
             d.etTriggerMaxRetries.setText(trigger.maxRetries.toString())
             d.etTriggerRetryDelay.setText(trigger.retryDelayMs.toString())
-            d.etTriggerColor.setText("#%06X".format(trigger.targetColor and 0xFFFFFF))
             val actPos = if (trigger.action == TriggerAction.WAIT_RETRY) 1 else 0
             d.spinnerTriggerAction.setSelection(actPos)
             d.groupTriggerRetry.visibility = if (actPos == 1) View.VISIBLE else View.GONE
+            when (trigger.mode) {
+                TriggerMode.REGION -> {
+                    d.rgTriggerMode.check(R.id.rbModeRegion)
+                    applyTriggerModeUi(1)
+                    d.etRegionW.setText(trigger.regionW.toString())
+                    d.etRegionH.setText(trigger.regionH.toString())
+                    d.etRegionThreshold.setText((trigger.regionMatchThreshold * 100).toInt().toString())
+                    if (trigger.regionPixels != null) {
+                        regionPixelsForSave = trigger.regionPixels
+                        d.tvRegionCaptureStatus.text = "캡처됨: (${trigger.checkX},${trigger.checkY}) ${trigger.regionW}×${trigger.regionH}px"
+                    }
+                }
+                TriggerMode.PIXEL -> {
+                    d.rgTriggerMode.check(R.id.rbModePixel)
+                    applyTriggerModeUi(0)
+                    d.etTriggerColor.setText("#%06X".format(trigger.targetColor and 0xFFFFFF))
+                }
+            }
+        } else {
+            applyTriggerModeUi(0)
         }
+
         // 색상 피커로 결과가 왔으면 색상·위치 적용
         if (pickedColor != null) {
-            // 스포이트 위치로 포인트 이동 옵션이 켜져 있으면 탭 X/Y도 덮어씀
             if (dropperX != null && dropperY != null) {
                 d.etDialogX.setText(dropperX.toString())
                 d.etDialogY.setText(dropperY.toString())
             }
             d.cbTrigger.isChecked     = true
             d.groupTrigger.visibility = View.VISIBLE
+            d.rgTriggerMode.check(R.id.rbModePixel)
+            applyTriggerModeUi(0)
             val colorHex = "#%06X".format(pickedColor and 0xFFFFFF)
             d.etTriggerColor.setText(colorHex)
             d.tvTriggerColorPreview.setBackgroundColor(pickedColor)
-            d.groupTriggerCoords.visibility = View.VISIBLE
             d.etTriggerX.setText(triggerCheckX.toString())
             d.etTriggerY.setText(triggerCheckY.toString())
         }
 
+        // 영역 캡처 결과가 왔으면 적용
+        if (capturedRegionPixels != null) {
+            regionPixelsForSave = capturedRegionPixels
+            d.cbTrigger.isChecked     = true
+            d.groupTrigger.visibility = View.VISIBLE
+            d.rgTriggerMode.check(R.id.rbModeRegion)
+            applyTriggerModeUi(1)
+            d.etTriggerX.setText(pendingRegionX.toString())
+            d.etTriggerY.setText(pendingRegionY.toString())
+            d.etRegionW.setText(pendingRegionW.toString())
+            d.etRegionH.setText(pendingRegionH.toString())
+            d.etRegionThreshold.setText(pendingRegionThresholdPct.toString())
+            d.spinnerTriggerAction.setSelection(pendingRegionActionPos)
+            d.groupTriggerRetry.visibility = if (pendingRegionActionPos == 1) View.VISIBLE else View.GONE
+            d.etTriggerTolerance.setText(pendingRegionTolerance.toString())
+            d.etTriggerMaxRetries.setText(pendingRegionMaxRetries.toString())
+            d.etTriggerRetryDelay.setText(pendingRegionRetryDelayMs.toString())
+            d.tvRegionCaptureStatus.text = "캡처됨: (${pendingRegionX},${pendingRegionY}) ${pendingRegionW}×${pendingRegionH}px"
+        }
+
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+        d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
+            applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
         d.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, position: Int, id: Long) {
@@ -662,7 +736,7 @@ class OverlayService : Service() {
             .setView(d.root)
             .setNeutralButton("삭제") { _, _ -> deletePointInOverlay(index, cfg) }
             .setNegativeButton("취소", null)
-            .setPositiveButton("확인") { _, _ -> savePointInOverlay(index, d, point, cfg) }
+            .setPositiveButton("확인") { _, _ -> savePointInOverlay(index, d, point, cfg, regionPixelsForSave) }
             .create()
 
         // 색상 피커 버튼
@@ -674,13 +748,28 @@ class OverlayService : Service() {
             })
         }
 
+        // 영역 드래그 지정 버튼
+        d.btnCaptureRegion.setOnClickListener {
+            pendingRegionPickIndex    = index
+            pendingRegionThresholdPct = d.etRegionThreshold.text?.toString()?.toIntOrNull()?.coerceIn(0, 100) ?: 90
+            pendingRegionActionPos    = d.spinnerTriggerAction.selectedItemPosition
+            pendingRegionTolerance    = d.etTriggerTolerance.text?.toString()?.toIntOrNull()?.coerceIn(0, 255) ?: 20
+            pendingRegionMaxRetries   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
+            pendingRegionRetryDelayMs = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
+            dialog.dismiss()
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_REGION_CAPTURE)
+                putExtra(CoordPickerService.EXTRA_REGION_RESULT_TARGET, "overlay_region")
+            })
+        }
+
         // 꺾임 추가/삭제 버튼 (dialog 참조 필요하므로 생성 후 설정)
         fun updateWaypointUi(extras: List<SwipeWaypoint>) {
             d.tvSwipeWaypointCount.text = if (extras.isEmpty()) "꺾임: 없음" else "꺾임: ${extras.size}개"
             d.btnRemoveWaypoint.isEnabled = extras.isNotEmpty()
         }
         d.btnAddWaypoint.setOnClickListener {
-            savePointInOverlay(index, d, point, cfg)
+            savePointInOverlay(index, d, point, cfg, regionPixelsForSave)
             val freshCfg = SequencePrefs.load(this) ?: return@setOnClickListener
             val freshPt = freshCfg.points.getOrNull(index) ?: return@setOnClickListener
             val lastX = freshPt.swipeExtraPoints.lastOrNull()?.x ?: freshPt.endX
@@ -717,7 +806,7 @@ class OverlayService : Service() {
         dialog.show()
     }
 
-    private fun savePointInOverlay(index: Int, d: DialogAddPointBinding, original: ClickPoint, cfg: ClickSequenceConfig) {
+    private fun savePointInOverlay(index: Int, d: DialogAddPointBinding, original: ClickPoint, cfg: ClickSequenceConfig, regionPixels: IntArray? = null) {
         val gesturePos = d.spinnerGesture.selectedItemPosition
         val gesture = when (gesturePos) { 1 -> GestureType.LONG_PRESS; 2 -> GestureType.SWIPE; else -> GestureType.TAP }
 
@@ -751,17 +840,31 @@ class OverlayService : Service() {
         }
 
         val newTrigger = if (d.cbTrigger.isChecked) {
-            val cx    = d.etTriggerX.text?.toString()?.toIntOrNull()
-            val cy    = d.etTriggerY.text?.toString()?.toIntOrNull()
-            val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
-            if (cx == null || cy == null || color == null) original.trigger
+            val cx = d.etTriggerX.text?.toString()?.toIntOrNull()
+            val cy = d.etTriggerY.text?.toString()?.toIntOrNull()
+            if (cx == null || cy == null) original.trigger
             else {
                 val tol    = d.etTriggerTolerance.text?.toString()?.toIntOrNull()?.coerceIn(0, 255) ?: 20
                 val actPos = d.spinnerTriggerAction.selectedItemPosition
                 val action = if (actPos == 1) TriggerAction.WAIT_RETRY else TriggerAction.SKIP
                 val maxR   = d.etTriggerMaxRetries.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 5
                 val rDelay = d.etTriggerRetryDelay.text?.toString()?.toLongOrNull()?.coerceAtLeast(100L) ?: 500L
-                TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                val modePos = if (d.rbModeRegion.isChecked) 1 else 0
+                if (modePos == 1) {
+                    // 이미지 영역 모드
+                    val rw  = d.etRegionW.text?.toString()?.toIntOrNull() ?: 0
+                    val rh  = d.etRegionH.text?.toString()?.toIntOrNull() ?: 0
+                    val thr = (d.etRegionThreshold.text?.toString()?.toIntOrNull() ?: 90).coerceIn(0, 100) / 100f
+                    val px  = regionPixels ?: original.trigger?.takeIf { it.mode == TriggerMode.REGION }?.regionPixels
+                    TriggerCondition(cx, cy, 0, tol, action, maxR, rDelay,
+                        mode = TriggerMode.REGION, regionW = rw, regionH = rh,
+                        regionPixels = px, regionMatchThreshold = thr)
+                } else {
+                    // 색상 픽셀 모드
+                    val color = TriggerCondition.parseColor(d.etTriggerColor.text?.toString()?.trim() ?: "")
+                    if (color == null) original.trigger
+                    else TriggerCondition(cx, cy, color, tol, action, maxR, rDelay)
+                }
             }
         } else null
 

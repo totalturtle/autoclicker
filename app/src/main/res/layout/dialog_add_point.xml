@@ -268,6 +268,43 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <!-- 트리거 유형 선택 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="트리거 유형"
+                android:textColor="#BBBBBB"
+                android:textSize="12sp" />
+
+            <RadioGroup
+                android:id="@+id/rgTriggerMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp">
+
+                <RadioButton
+                    android:id="@+id/rbModePixel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="색상 픽셀"
+                    android:textColor="#FFFFFF"
+                    android:checked="true" />
+
+                <RadioButton
+                    android:id="@+id/rbModeRegion"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="이미지 영역"
+                    android:textColor="#FFFFFF" />
+
+            </RadioGroup>
+
+            <!-- 공통: 체크 위치 X / Y (픽셀=체크 좌표, 영역=좌상단 좌표) -->
             <LinearLayout
                 android:id="@+id/groupTriggerCoords"
                 android:layout_width="match_parent"
@@ -319,59 +356,123 @@
 
             </LinearLayout>
 
+            <!-- 색상 픽셀 모드 전용 -->
             <LinearLayout
+                android:id="@+id/groupTriggerPixel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:hint="@string/hint_trigger_color"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etTriggerColor"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:text="#FF0000" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/tvTriggerColorPreview"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="8dp"
+                        android:background="#FF0000"
+                        android:text="" />
+
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPickColor"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="색상 피커 (화면 터치)" />
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:hint="@string/hint_trigger_color"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/hint_trigger_tolerance"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etTriggerColor"
+                        android:id="@+id/etTriggerTolerance"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="text"
-                        android:text="#FF0000" />
+                        android:inputType="number"
+                        android:text="20" />
                 </com.google.android.material.textfield.TextInputLayout>
-
-                <TextView
-                    android:id="@+id/tvTriggerColorPreview"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginEnd="8dp"
-                    android:background="#FF0000"
-                    android:text="" />
 
             </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPickColor"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <!-- 이미지 영역 모드 전용 -->
+            <LinearLayout
+                android:id="@+id/groupTriggerRegion"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="색상 피커 (화면 터치)" />
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="@string/hint_trigger_tolerance"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                <!-- W/H: 드래그 결과로 자동 채워짐 (숨김) -->
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etTriggerTolerance"
+                    android:id="@+id/etRegionW"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:inputType="number" />
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etRegionH"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:inputType="number" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCaptureRegion"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:text="20" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="6dp"
+                    android:text="드래그로 영역 지정" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="일치율 (%,  0~100)"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etRegionThreshold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:text="90" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:id="@+id/tvRegionCaptureStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="캡처 없음"
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
