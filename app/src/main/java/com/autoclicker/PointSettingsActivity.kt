@@ -99,6 +99,51 @@ class PointSettingsActivity : AppCompatActivity() {
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
 
+        // 개별 RadioButton.isChecked 직접 제어 (RadioGroup 신뢰 불가)
+        if (point.pointRepeatMode == RepeatMode.DURATION) {
+            d.rbPointRepeatTime.isChecked = true
+            d.rbPointRepeatCount.isChecked = false
+            d.layoutPointRepeatCount.visibility = View.GONE
+            d.layoutPointRepeatDuration.visibility = View.VISIBLE
+            val ms = point.pointRepeatDurationMs
+            val (displayVal, unitPos) = when {
+                ms > 0 && ms % 3_600_000L == 0L -> Pair(ms / 3_600_000L, 2)
+                ms > 0 && ms % 60_000L == 0L    -> Pair(ms / 60_000L, 1)
+                else                             -> Pair((ms / 1_000L).coerceAtLeast(1L), 0)
+            }
+            d.etDialogPointRepeatDuration.setText(displayVal.toString())
+            when (unitPos) {
+                1    -> { d.rbPointUnitMin.isChecked = true; d.rbPointUnitSec.isChecked = false; d.rbPointUnitHour.isChecked = false }
+                2    -> { d.rbPointUnitHour.isChecked = true; d.rbPointUnitSec.isChecked = false; d.rbPointUnitMin.isChecked = false }
+                else -> { d.rbPointUnitSec.isChecked = true; d.rbPointUnitMin.isChecked = false; d.rbPointUnitHour.isChecked = false }
+            }
+        } else {
+            d.rbPointRepeatCount.isChecked = true
+            d.rbPointRepeatTime.isChecked = false
+            d.layoutPointRepeatCount.visibility = View.VISIBLE
+            d.layoutPointRepeatDuration.visibility = View.GONE
+        }
+
+        // 개별 리스너: 한쪽이 켜지면 다른쪽 수동 해제 + 가시성 토글
+        d.rbPointRepeatTime.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                d.rbPointRepeatCount.isChecked = false
+                d.layoutPointRepeatCount.visibility = View.GONE
+                d.layoutPointRepeatDuration.visibility = View.VISIBLE
+            }
+        }
+        d.rbPointRepeatCount.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                d.rbPointRepeatTime.isChecked = false
+                d.layoutPointRepeatCount.visibility = View.VISIBLE
+                d.layoutPointRepeatDuration.visibility = View.GONE
+            }
+        }
+        // 단위 RadioButton 상호 배타 (개별 isChecked)
+        d.rbPointUnitSec.setOnCheckedChangeListener { _, c -> if (c) { d.rbPointUnitMin.isChecked = false; d.rbPointUnitHour.isChecked = false } }
+        d.rbPointUnitMin.setOnCheckedChangeListener { _, c -> if (c) { d.rbPointUnitSec.isChecked = false; d.rbPointUnitHour.isChecked = false } }
+        d.rbPointUnitHour.setOnCheckedChangeListener { _, c -> if (c) { d.rbPointUnitSec.isChecked = false; d.rbPointUnitMin.isChecked = false } }
+
         val gesturePos = when (point.gesture) {
             GestureType.LONG_PRESS -> 1
             GestureType.SWIPE      -> 2
@@ -243,6 +288,14 @@ class PointSettingsActivity : AppCompatActivity() {
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
         val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        // 개별 RadioButton.isChecked 직접 읽기 (RadioGroup 신뢰 불가)
+        val pointRepeatMode = if (d.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
+        val pointRepeatDurationValue = d.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
+        val pointRepeatDurationMs = when {
+            d.rbPointUnitHour.isChecked -> pointRepeatDurationValue * 3_600_000L
+            d.rbPointUnitMin.isChecked  -> pointRepeatDurationValue * 60_000L
+            else                        -> pointRepeatDurationValue * 1_000L
+        }
 
         var endX = x; var endY = y
         var longMs = original.longPressDurationMs
@@ -300,6 +353,8 @@ class PointSettingsActivity : AppCompatActivity() {
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, pointRepeatCount = pointRepeat,
+            pointRepeatMode = pointRepeatMode,
+            pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
             swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList()
         )
 

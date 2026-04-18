@@ -594,6 +594,55 @@ class OverlayService : Service() {
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
 
+        // 반복 모드 UI 복원 (RadioGroup 버그 회피 — 개별 isChecked 직접 제어)
+        if (point.pointRepeatMode == RepeatMode.DURATION) {
+            d.rbPointRepeatTime.isChecked = true
+            d.rbPointRepeatCount.isChecked = false
+            d.layoutPointRepeatCount.visibility = View.GONE
+            d.layoutPointRepeatDuration.visibility = View.VISIBLE
+            val ms = point.pointRepeatDurationMs.coerceAtLeast(0L)
+            val (dispVal, unitPos) = when {
+                ms <= 0L -> Pair(1L, 0)
+                ms % 3_600_000L == 0L -> Pair(ms / 3_600_000L, 2)
+                ms % 60_000L == 0L    -> Pair(ms / 60_000L, 1)
+                else                  -> Pair(ms / 1_000L, 0)
+            }
+            d.etDialogPointRepeatDuration.setText(dispVal.toString())
+            when (unitPos) {
+                1 -> { d.rbPointUnitMin.isChecked = true;  d.rbPointUnitSec.isChecked = false; d.rbPointUnitHour.isChecked = false }
+                2 -> { d.rbPointUnitHour.isChecked = true; d.rbPointUnitSec.isChecked = false; d.rbPointUnitMin.isChecked  = false }
+                else -> { d.rbPointUnitSec.isChecked = true; d.rbPointUnitMin.isChecked = false; d.rbPointUnitHour.isChecked = false }
+            }
+        } else {
+            d.rbPointRepeatCount.isChecked = true
+            d.rbPointRepeatTime.isChecked = false
+            d.layoutPointRepeatCount.visibility = View.VISIBLE
+            d.layoutPointRepeatDuration.visibility = View.GONE
+        }
+        d.rbPointRepeatTime.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                d.rbPointRepeatCount.isChecked = false
+                d.layoutPointRepeatCount.visibility = View.GONE
+                d.layoutPointRepeatDuration.visibility = View.VISIBLE
+            }
+        }
+        d.rbPointRepeatCount.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                d.rbPointRepeatTime.isChecked = false
+                d.layoutPointRepeatCount.visibility = View.VISIBLE
+                d.layoutPointRepeatDuration.visibility = View.GONE
+            }
+        }
+        d.rbPointUnitSec.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) { d.rbPointUnitMin.isChecked = false; d.rbPointUnitHour.isChecked = false }
+        }
+        d.rbPointUnitMin.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) { d.rbPointUnitSec.isChecked = false; d.rbPointUnitHour.isChecked = false }
+        }
+        d.rbPointUnitHour.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) { d.rbPointUnitSec.isChecked = false; d.rbPointUnitMin.isChecked = false }
+        }
+
         val gesturePos = when (point.gesture) {
             GestureType.LONG_PRESS -> 1
             GestureType.SWIPE      -> 2
@@ -817,6 +866,18 @@ class OverlayService : Service() {
         val variance = d.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
+        // 반복 모드/시간 읽기 — 개별 isChecked 직접 확인
+        val pointRepeatMode = if (d.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
+        val pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) {
+            val v = d.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
+            val mul = when {
+                d.rbPointUnitHour.isChecked -> 3_600_000L
+                d.rbPointUnitMin.isChecked  -> 60_000L
+                else                        -> 1_000L
+            }
+            v * mul
+        } else 0L
+
         var endX = x; var endY = y
         var longMs = original.longPressDurationMs
         var swipeMs = original.swipeDurationMs
@@ -878,6 +939,8 @@ class OverlayService : Service() {
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, randomVarianceMs = variance,
             pointRepeatCount = pointRepeat,
+            pointRepeatMode = pointRepeatMode,
+            pointRepeatDurationMs = pointRepeatDurationMs,
             swipeExtraPoints = freshExtras
         )
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }

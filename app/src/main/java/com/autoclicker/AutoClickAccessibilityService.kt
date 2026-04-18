@@ -178,15 +178,34 @@ class AutoClickAccessibilityService : AccessibilityService() {
         clickJob = serviceScope.launch {
             delay(300L) // 재생 버튼 터치가 완전히 처리된 후 첫 제스처 시작
             SessionLogger.startSession()
-            val infinite = config.repeatCount == 0
+            val globalInfinite = config.repeatMode == RepeatMode.COUNT && config.repeatCount == 0
+            val globalDeadline = if (config.repeatMode == RepeatMode.DURATION)
+                System.currentTimeMillis() + config.repeatDurationMs else Long.MAX_VALUE
             var round = 0
             var totalClicks = 0
 
+            fun shouldContinueGlobal() = when (config.repeatMode) {
+                RepeatMode.COUNT    -> globalInfinite || round < config.repeatCount
+                RepeatMode.DURATION -> System.currentTimeMillis() < globalDeadline
+            }
+
             try {
-                while (infinite || round < config.repeatCount) {
+                while (shouldContinueGlobal()) {
                     for (point in config.points) {
+                        ensureActive()
+                        if (!shouldContinueGlobal()) break
+
+                        val pointDeadline = if (point.pointRepeatMode == RepeatMode.DURATION)
+                            System.currentTimeMillis() + point.pointRepeatDurationMs else Long.MAX_VALUE
                         val repeatTimes = point.pointRepeatCount.coerceAtLeast(1)
-                        for (r in 0 until repeatTimes) {
+                        var pr = 0
+
+                        fun shouldContinuePoint() = when (point.pointRepeatMode) {
+                            RepeatMode.COUNT    -> pr < repeatTimes
+                            RepeatMode.DURATION -> System.currentTimeMillis() < pointDeadline
+                        }
+
+                        while (shouldContinuePoint()) {
                             ensureActive()
                             val clicked = performPoint(point)
                             if (clicked) {
@@ -196,12 +215,14 @@ class AutoClickAccessibilityService : AccessibilityService() {
                             } else {
                                 SessionLogger.logSkip(point.label, point.x, point.y)
                             }
+                            pr++
+                            ensureActive()
                             delay(config.delayAfter(point))
                         }
                     }
                     round++
                 }
-                if (!infinite) broadcastStop()
+                if (!globalInfinite) broadcastStop()
             } finally {
                 SessionLogger.endSession()
             }

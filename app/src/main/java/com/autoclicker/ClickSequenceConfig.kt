@@ -20,18 +20,24 @@ data class ClickPoint(
     val swipeDurationMs: Long = 350L,
     val trigger: TriggerCondition? = null,
     val randomVarianceMs: Long = 0L,
-    val pointRepeatCount: Int = 1,        // 해당 포인트 단독 반복 횟수 (1=반복 없음)
-    val swipeExtraPoints: List<SwipeWaypoint> = emptyList() // 꺾임 경유점 (1-2, 1-3, ...)
+    val pointRepeatCount: Int = 1,
+    val swipeExtraPoints: List<SwipeWaypoint> = emptyList(),
+    val pointRepeatMode: RepeatMode = RepeatMode.COUNT,
+    val pointRepeatDurationMs: Long = 0L
 )
 
 /**
  * 다중 포인트 시퀀스 설정.
- * repeatCount: 전체 시퀀스를 몇 번 반복할지. 0 = 무한.
+ * repeatCount: 전체 시퀀스를 몇 번 반복할지. 0 = 무한 (COUNT 모드일 때만 유효).
+ * repeatMode: COUNT = 횟수 기반, DURATION = 시간 기반.
+ * repeatDurationMs: DURATION 모드일 때 총 실행 시간(밀리초).
  */
 data class ClickSequenceConfig(
     val points: List<ClickPoint>,
     val globalDelayMs: Long,
-    val repeatCount: Int
+    val repeatCount: Int,
+    val repeatMode: RepeatMode = RepeatMode.COUNT,
+    val repeatDurationMs: Long = 0L
 ) {
     fun delayAfter(point: ClickPoint): Long {
         val base = if (point.delayAfterMs >= 0) point.delayAfterMs else globalDelayMs
@@ -81,6 +87,10 @@ data class ClickSequenceConfig(
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
                     if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
+                    if (p.pointRepeatMode == RepeatMode.DURATION) {
+                        put("prm", "d")
+                        put("prd", p.pointRepeatDurationMs)
+                    }
                     if (p.swipeExtraPoints.isNotEmpty()) put("swp", JSONArray().also { arr ->
                         p.swipeExtraPoints.forEach { wp ->
                             arr.put(JSONObject().apply { put("x", wp.x); put("y", wp.y) })
@@ -93,6 +103,10 @@ data class ClickSequenceConfig(
             put("points", arr)
             put("globalDelay", globalDelayMs)
             put("repeat", repeatCount)
+            if (repeatMode == RepeatMode.DURATION) {
+                put("rm", "d")
+                put("rd", repeatDurationMs)
+            }
         }.toString()
     }
 
@@ -144,6 +158,8 @@ data class ClickSequenceConfig(
                                 trigger = trigger,
                                 randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L),
                                 pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1),
+                                pointRepeatMode = if (o.optString("prm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
+                                pointRepeatDurationMs = o.optLong("prd", 0L).coerceAtLeast(0L),
                                 swipeExtraPoints = if (o.has("swp")) {
                                     val arr = o.getJSONArray("swp")
                                     buildList { for (i in 0 until arr.length()) {
@@ -158,7 +174,9 @@ data class ClickSequenceConfig(
                 ClickSequenceConfig(
                     points = list,
                     globalDelayMs = root.optLong("globalDelay", 1000L).coerceAtLeast(100L),
-                    repeatCount = root.optInt("repeat", 0).coerceAtLeast(0)
+                    repeatCount = root.optInt("repeat", 0).coerceAtLeast(0),
+                    repeatMode = if (root.optString("rm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
+                    repeatDurationMs = root.optLong("rd", 0L).coerceAtLeast(0L)
                 )
             }.getOrNull()
         }

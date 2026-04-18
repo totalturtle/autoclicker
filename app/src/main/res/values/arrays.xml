@@ -13,4 +13,8 @@
         <item>색상 픽셀</item>
         <item>이미지 영역</item>
     </string-array>
+    <string-array name="repeat_mode_labels">
+        <item>횟수 반복</item>
+        <item>시간 반복</item>
+    </string-array>
 </resources>

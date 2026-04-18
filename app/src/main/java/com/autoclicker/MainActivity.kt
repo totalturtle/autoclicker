@@ -38,6 +38,9 @@ data class PointDialogState(
     val delayAfter: String = "",
     val variance: String = "",
     val pointRepeat: String = "1",
+    val pointRepeatModePos: Int = 0,
+    val pointRepeatDuration: String = "1",
+    val pointRepeatDurationUnit: Int = 0,
     val triggerEnabled: Boolean = false,
     val triggerModePos: Int = 0,
     val triggerX: String = "",
@@ -96,7 +99,7 @@ class MainActivity : AppCompatActivity() {
             points.clear()
             points.addAll(config.points)
             binding.etDelay.setText(config.globalDelayMs.toString())
-            binding.etRepeat.setText(config.repeatCount.toString())
+            applyRepeatModeToUI(config)
             pointAdapter.notifyDataSetChanged()
             persistSequence()
             Toast.makeText(this, R.string.toast_profile_loaded_generic, Toast.LENGTH_SHORT).show()
@@ -122,7 +125,7 @@ class MainActivity : AppCompatActivity() {
                     points.clear()
                     points.addAll(cfg.points)
                     binding.etDelay.setText(cfg.globalDelayMs.toString())
-                    binding.etRepeat.setText(cfg.repeatCount.toString())
+                    applyRepeatModeToUI(cfg)
                     pointAdapter.notifyDataSetChanged()
                     Toast.makeText(this@MainActivity, getString(R.string.toast_auto_profile_loaded, name), Toast.LENGTH_SHORT).show()
                 }
@@ -361,9 +364,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnApplyRepeat.setOnClickListener {
-            val repeat = binding.etRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             persistSequence()
-            val msg = if (repeat == 0) "무한 반복으로 설정했습니다." else "반복 횟수 ${repeat}회를 적용했습니다."
+            val isDuration = binding.rbRepeatTime.isChecked
+            val msg = if (isDuration) {
+                val value = binding.etRepeatDuration.text?.toString()?.toLongOrNull() ?: 1L
+                val unit = when {
+                    binding.rbUnitHour.isChecked -> "시간"
+                    binding.rbUnitMin.isChecked  -> "분"
+                    else                          -> "초"
+                }
+                "시간 반복 ${value}${unit}으로 설정했습니다."
+            } else {
+                val repeat = binding.etRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                if (repeat == 0) "무한 반복으로 설정했습니다." else "반복 횟수 ${repeat}회를 적용했습니다."
+            }
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
 
@@ -392,6 +406,26 @@ class MainActivity : AppCompatActivity() {
                 setPackage(packageName)
             })
         }
+
+        // 전체 반복 모드: 개별 RadioButton.setOnCheckedChangeListener (RadioGroup 신뢰 불가)
+        binding.rbRepeatTime.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.rbRepeatCount.isChecked = false
+                binding.layoutRepeatCount.visibility = View.GONE
+                binding.layoutRepeatDuration.visibility = View.VISIBLE
+            }
+        }
+        binding.rbRepeatCount.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                binding.rbRepeatTime.isChecked = false
+                binding.layoutRepeatCount.visibility = View.VISIBLE
+                binding.layoutRepeatDuration.visibility = View.GONE
+            }
+        }
+        // 단위 버튼 개별 상호 배타
+        binding.rbUnitSec.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitMin.isChecked = false; binding.rbUnitHour.isChecked = false } }
+        binding.rbUnitMin.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitHour.isChecked = false } }
+        binding.rbUnitHour.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitMin.isChecked = false } }
 
     }
 
@@ -427,12 +461,32 @@ class MainActivity : AppCompatActivity() {
         dialogBinding.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
+
         dialogBinding.spinnerTriggerAction.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 dialogBinding.groupTriggerRetry.visibility = if (position == 1) View.VISIBLE else View.GONE
             }
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
+
+        // 포인트 반복 모드: 개별 RadioButton.isChecked 직접 제어
+        dialogBinding.rbPointRepeatTime.setOnCheckedChangeListener { _, c ->
+            if (c) {
+                dialogBinding.rbPointRepeatCount.isChecked = false
+                dialogBinding.layoutPointRepeatCount.visibility = View.GONE
+                dialogBinding.layoutPointRepeatDuration.visibility = View.VISIBLE
+            }
+        }
+        dialogBinding.rbPointRepeatCount.setOnCheckedChangeListener { _, c ->
+            if (c) {
+                dialogBinding.rbPointRepeatTime.isChecked = false
+                dialogBinding.layoutPointRepeatCount.visibility = View.VISIBLE
+                dialogBinding.layoutPointRepeatDuration.visibility = View.GONE
+            }
+        }
+        dialogBinding.rbPointUnitSec.setOnCheckedChangeListener { _, c -> if (c) { dialogBinding.rbPointUnitMin.isChecked = false; dialogBinding.rbPointUnitHour.isChecked = false } }
+        dialogBinding.rbPointUnitMin.setOnCheckedChangeListener { _, c -> if (c) { dialogBinding.rbPointUnitSec.isChecked = false; dialogBinding.rbPointUnitHour.isChecked = false } }
+        dialogBinding.rbPointUnitHour.setOnCheckedChangeListener { _, c -> if (c) { dialogBinding.rbPointUnitSec.isChecked = false; dialogBinding.rbPointUnitMin.isChecked = false } }
 
         // 영역 캡처 결과 픽셀 (다이얼로그 저장용)
         var regionPixelsForSave: IntArray? = pendingRegionPixelsForDialog
@@ -450,6 +504,23 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
             dialogBinding.etDialogVariance.setText(prefill.variance)
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
+            if (prefill.pointRepeatModePos == 1) {
+                dialogBinding.rbPointRepeatTime.isChecked = true
+                dialogBinding.rbPointRepeatCount.isChecked = false
+                dialogBinding.layoutPointRepeatCount.visibility = View.GONE
+                dialogBinding.layoutPointRepeatDuration.visibility = View.VISIBLE
+            } else {
+                dialogBinding.rbPointRepeatCount.isChecked = true
+                dialogBinding.rbPointRepeatTime.isChecked = false
+                dialogBinding.layoutPointRepeatCount.visibility = View.VISIBLE
+                dialogBinding.layoutPointRepeatDuration.visibility = View.GONE
+            }
+            if (prefill.pointRepeatDuration.isNotEmpty()) dialogBinding.etDialogPointRepeatDuration.setText(prefill.pointRepeatDuration)
+            when (prefill.pointRepeatDurationUnit) {
+                1    -> { dialogBinding.rbPointUnitMin.isChecked = true; dialogBinding.rbPointUnitSec.isChecked = false; dialogBinding.rbPointUnitHour.isChecked = false }
+                2    -> { dialogBinding.rbPointUnitHour.isChecked = true; dialogBinding.rbPointUnitSec.isChecked = false; dialogBinding.rbPointUnitMin.isChecked = false }
+                else -> { dialogBinding.rbPointUnitSec.isChecked = true; dialogBinding.rbPointUnitMin.isChecked = false; dialogBinding.rbPointUnitHour.isChecked = false }
+            }
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
             if (prefill.triggerModePos == 1) dialogBinding.rgTriggerMode.check(R.id.rbModeRegion)
@@ -545,6 +616,14 @@ class MainActivity : AppCompatActivity() {
                 val delayAfter = dialogBinding.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
                 val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 val pointRepeat = dialogBinding.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                val pointRepeatMode = if (dialogBinding.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
+                val pointRepeatDurationValue = dialogBinding.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
+                val pointRepeatUnitPos = when {
+                    dialogBinding.rbPointUnitHour.isChecked -> 2
+                    dialogBinding.rbPointUnitMin.isChecked  -> 1
+                    else                                     -> 0
+                }
+                val pointRepeatDurationMs = displayToMs(pointRepeatDurationValue, pointRepeatUnitPos)
 
                 if (x == null || y == null) {
                     Toast.makeText(this, "X, Y 좌표를 입력하세요.", Toast.LENGTH_SHORT).show()
@@ -635,7 +714,9 @@ class MainActivity : AppCompatActivity() {
                         swipeDurationMs = swipeMs,
                         trigger = trigger,
                         randomVarianceMs = variance,
-                        pointRepeatCount = pointRepeat
+                        pointRepeatCount = pointRepeat,
+                        pointRepeatMode = pointRepeatMode,
+                        pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L
                     )
                 )
                 pointAdapter.notifyItemInserted(points.size - 1)
@@ -659,6 +740,13 @@ class MainActivity : AppCompatActivity() {
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
+        pointRepeatModePos    = if (d.rbPointRepeatTime.isChecked) 1 else 0,
+        pointRepeatDuration   = d.etDialogPointRepeatDuration.text?.toString().orEmpty(),
+        pointRepeatDurationUnit = when {
+            d.rbPointUnitHour.isChecked -> 2
+            d.rbPointUnitMin.isChecked  -> 1
+            else                         -> 0
+        },
         triggerEnabled    = d.cbTrigger.isChecked,
         triggerModePos    = if (d.rbModeRegion.isChecked) 1 else 0,
         triggerX          = d.etTriggerX.text?.toString().orEmpty(),
@@ -681,13 +769,54 @@ class MainActivity : AppCompatActivity() {
         if (cfg != null) {
             points.addAll(cfg.points)
             binding.etDelay.setText(cfg.globalDelayMs.toString())
-            binding.etRepeat.setText(cfg.repeatCount.toString())
+            applyRepeatModeToUI(cfg)
         } else {
             binding.etDelay.setText("1000")
+            binding.rbRepeatCount.isChecked = true
+            binding.rbRepeatTime.isChecked = false
             binding.etRepeat.setText("0")
+            binding.layoutRepeatCount.visibility = View.VISIBLE
+            binding.layoutRepeatDuration.visibility = View.GONE
         }
         binding.switchVolumeHotkey.isChecked = SequencePrefs.isVolumeHotkeyEnabled(this)
         pointAdapter.notifyDataSetChanged()
+    }
+
+    private fun applyRepeatModeToUI(cfg: ClickSequenceConfig) {
+        if (cfg.repeatMode == RepeatMode.DURATION) {
+            binding.rbRepeatTime.isChecked = true
+            binding.rbRepeatCount.isChecked = false
+            binding.layoutRepeatCount.visibility = View.GONE
+            binding.layoutRepeatDuration.visibility = View.VISIBLE
+            val (displayVal, unitPos) = msToDisplayPair(cfg.repeatDurationMs)
+            binding.etRepeatDuration.setText(displayVal.toString())
+            when (unitPos) {
+                1    -> { binding.rbUnitMin.isChecked = true; binding.rbUnitSec.isChecked = false; binding.rbUnitHour.isChecked = false }
+                2    -> { binding.rbUnitHour.isChecked = true; binding.rbUnitSec.isChecked = false; binding.rbUnitMin.isChecked = false }
+                else -> { binding.rbUnitSec.isChecked = true; binding.rbUnitMin.isChecked = false; binding.rbUnitHour.isChecked = false }
+            }
+        } else {
+            binding.rbRepeatCount.isChecked = true
+            binding.rbRepeatTime.isChecked = false
+            binding.etRepeat.setText(cfg.repeatCount.toString())
+            binding.layoutRepeatCount.visibility = View.VISIBLE
+            binding.layoutRepeatDuration.visibility = View.GONE
+        }
+    }
+
+    private fun msToDisplayPair(ms: Long): Pair<Long, Int> {
+        if (ms <= 0L) return Pair(1L, 0)
+        return when {
+            ms % 3_600_000L == 0L -> Pair(ms / 3_600_000L, 2)
+            ms % 60_000L == 0L    -> Pair(ms / 60_000L, 1)
+            else                  -> Pair(ms / 1_000L, 0)
+        }
+    }
+
+    private fun displayToMs(value: Long, unitIndex: Int): Long = when (unitIndex) {
+        1    -> value * 60_000L
+        2    -> value * 3_600_000L
+        else -> value * 1_000L
     }
 
     private fun persistSequence() {
@@ -701,11 +830,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun readRawConfig(): ClickSequenceConfig {
         val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
-        val repeat = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
+        val repeatMode = if (binding.rbRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
+        val repeatCount = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
+        val repeatDurationValue = binding.etRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
+        val repeatUnitPos = when {
+            binding.rbUnitHour.isChecked -> 2
+            binding.rbUnitMin.isChecked  -> 1
+            else                          -> 0
+        }
+        val repeatDurationMs = displayToMs(repeatDurationValue, repeatUnitPos)
         return ClickSequenceConfig(
             points = points.toList(),
             globalDelayMs = global,
-            repeatCount = repeat.coerceAtLeast(0)
+            repeatCount = repeatCount.coerceAtLeast(0),
+            repeatMode = repeatMode,
+            repeatDurationMs = if (repeatMode == RepeatMode.DURATION) repeatDurationMs else 0L
         )
     }
 
@@ -715,7 +854,6 @@ class MainActivity : AppCompatActivity() {
             return null
         }
         val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
-        val repeat = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
 
         if (global < 100) {
             Toast.makeText(this, "딜레이는 최소 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
@@ -740,11 +878,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        return ClickSequenceConfig(
-            points = points.toList(),
-            globalDelayMs = global,
-            repeatCount = repeat.coerceAtLeast(0)
-        )
+        return readRawConfig()
     }
 
     // ── 자동 클릭 시작/정지 ─────────────────────────────────────────────
