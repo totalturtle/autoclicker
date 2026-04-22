@@ -258,9 +258,19 @@ class AutoClickAccessibilityService : AccessibilityService() {
                 }
             }
         }
+        // 좌표 오차 적용: 반경 내 균등 분포 (원형)
+        fun jitter(base: Int): Int {
+            val r = p.coordinateVariancePx
+            if (r <= 0) return base
+            val angle = Math.random() * 2 * Math.PI
+            val dist = Math.sqrt(Math.random()) * r
+            return base + (dist * Math.cos(angle)).toInt()
+        }
+        val jx = jitter(p.x); val jy = jitter(p.y)
+
         when (p.gesture) {
-            GestureType.TAP -> dispatchStroke(p.x, p.y, p.x, p.y, 50L)
-            GestureType.LONG_PRESS -> dispatchStroke(p.x, p.y, p.x, p.y, p.longPressDurationMs.coerceIn(100L, 60_000L))
+            GestureType.TAP -> dispatchStroke(jx, jy, jx, jy, 50L)
+            GestureType.LONG_PRESS -> dispatchStroke(jx, jy, jx, jy, p.longPressDurationMs.coerceIn(100L, 60_000L))
             GestureType.SWIPE -> {
                 val dur = p.swipeDurationMs.coerceIn(50L, 60_000L)
                 if (p.swipeExtraPoints.isEmpty()) {

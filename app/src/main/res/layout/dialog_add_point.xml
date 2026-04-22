@@ -219,11 +219,25 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:hint="오차 (ms)"
+                android:hint="딜레이오차 (ms)"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDialogVariance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="좌표 오차 (px)"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etDialogCoordVariance"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="number" />
@@ -239,29 +253,46 @@
             android:layout_marginTop="8dp">
 
             <!-- 반복 모드 선택 -->
-            <RadioGroup
-                android:id="@+id/rgPointRepeatMode"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:layout_marginBottom="8dp">
 
-                <RadioButton
-                    android:id="@+id/rbPointRepeatCount"
+                <RadioGroup
+                    android:id="@+id/rgPointRepeatMode"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="횟수 반복"
-                    android:textColor="#FFFFFF"
-                    android:checked="true" />
+                    android:orientation="horizontal">
 
-                <RadioButton
-                    android:id="@+id/rbPointRepeatTime"
-                    android:layout_width="wrap_content"
+                    <RadioButton
+                        android:id="@+id/rbPointRepeatCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="횟수 반복"
+                        android:textColor="#FFFFFF"
+                        android:checked="true" />
+
+                    <RadioButton
+                        android:id="@+id/rbPointRepeatTime"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:text="시간 반복"
+                        android:textColor="#FFFFFF" />
+                </RadioGroup>
+
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="시간 반복"
-                    android:textColor="#FFFFFF" />
-            </RadioGroup>
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="(다음 포인트로 넘어가기전에 반복하는 횟수/시간)"
+                    android:textColor="#8B949E"
+                    android:textSize="10sp" />
+
+            </LinearLayout>
 
             <!-- 횟수 입력 (항상 표시) -->
             <com.google.android.material.textfield.TextInputLayout

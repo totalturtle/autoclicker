@@ -23,7 +23,8 @@ data class ClickPoint(
     val pointRepeatCount: Int = 1,
     val swipeExtraPoints: List<SwipeWaypoint> = emptyList(),
     val pointRepeatMode: RepeatMode = RepeatMode.COUNT,
-    val pointRepeatDurationMs: Long = 0L
+    val pointRepeatDurationMs: Long = 0L,
+    val coordinateVariancePx: Int = 0
 )
 
 /**
@@ -86,6 +87,7 @@ data class ClickSequenceConfig(
                         })
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
+                    if (p.coordinateVariancePx > 0) put("cv", p.coordinateVariancePx)
                     if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
                     if (p.pointRepeatMode == RepeatMode.DURATION) {
                         put("prm", "d")
@@ -160,6 +162,7 @@ data class ClickSequenceConfig(
                                 pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1),
                                 pointRepeatMode = if (o.optString("prm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
                                 pointRepeatDurationMs = o.optLong("prd", 0L).coerceAtLeast(0L),
+                                coordinateVariancePx = o.optInt("cv", 0).coerceAtLeast(0),
                                 swipeExtraPoints = if (o.has("swp")) {
                                     val arr = o.getJSONArray("swp")
                                     buildList { for (i in 0 until arr.length()) {

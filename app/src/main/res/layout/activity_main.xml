@@ -21,9 +21,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="AutoClicker"
-            android:textColor="@color/text_primary"
+            android:textColor="#FFFFFF"
             android:textSize="20sp"
-            android:fontFamily="sans-serif-medium" />
+            android:fontFamily="sans-serif"
+            android:textStyle="bold"
+            android:shadowColor="@android:color/transparent"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="0" />
 
         <ImageButton
             android:id="@+id/btnSettings"
@@ -84,7 +89,12 @@
                         android:layout_weight="1"
                         android:text="@string/status_accessibility_off"
                         android:textColor="@color/perm_warn"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif"
+                        android:shadowColor="@android:color/transparent"
+                        android:shadowDx="0"
+                        android:shadowDy="0"
+                        android:shadowRadius="0" />
 
                     <Button
                         android:id="@+id/btnEnableAccessibility"
@@ -111,7 +121,12 @@
                         android:layout_weight="1"
                         android:text="@string/status_overlay_off"
                         android:textColor="@color/perm_warn"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif"
+                        android:shadowColor="@android:color/transparent"
+                        android:shadowDx="0"
+                        android:shadowDy="0"
+                        android:shadowRadius="0" />
 
                     <Button
                         android:id="@+id/btnEnableOverlay"
@@ -146,16 +161,26 @@
                     android:text="@string/status_idle"
                     android:textColor="@color/status_idle"
                     android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium" />
+                    android:fontFamily="sans-serif"
+                    android:textStyle="bold"
+                    android:shadowColor="@android:color/transparent"
+                    android:shadowDx="0"
+                    android:shadowDy="0"
+                    android:shadowRadius="0" />
 
                 <TextView
                     android:id="@+id/tvClickCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="클릭 횟수: 0"
-                    android:textColor="@color/text_primary"
+                    android:textColor="#FFFFFF"
                     android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium" />
+                    android:fontFamily="sans-serif"
+                    android:textStyle="bold"
+                    android:shadowColor="@android:color/transparent"
+                    android:shadowDx="0"
+                    android:shadowDy="0"
+                    android:shadowRadius="0" />
             </LinearLayout>
 
             <!-- ── 포인트 카드 ── -->
@@ -172,10 +197,14 @@
 
                 <!-- 헤더 -->
                 <LinearLayout
+                    android:id="@+id/headerPointList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackground"
                     android:layout_marginBottom="4dp">
 
                     <TextView
@@ -205,14 +234,33 @@
                         android:paddingStart="12dp"
                         android:paddingEnd="12dp"
                         style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                    <!-- 접기/펼치기 화살표 -->
+                    <TextView
+                        android:id="@+id/tvPointListChevron"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:gravity="center"
+                        android:text="▲"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
                 </LinearLayout>
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvPoints"
+                <!-- 접히는 영역 -->
+                <LinearLayout
+                    android:id="@+id/layoutPointListBody"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:minHeight="40dp" />
+                    android:orientation="vertical">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvPoints"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        android:minHeight="40dp" />
+
+                </LinearLayout>
             </LinearLayout>
 
             <!-- ── 설정 카드 ── -->

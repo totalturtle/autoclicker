@@ -37,6 +37,7 @@ data class PointDialogState(
     val label: String = "",
     val delayAfter: String = "",
     val variance: String = "",
+    val coordVariance: String = "",
     val pointRepeat: String = "1",
     val pointRepeatModePos: Int = 0,
     val pointRepeatDuration: String = "1",
@@ -333,6 +334,13 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnAddPoint.setOnClickListener { showAddPointDialog() }
 
+        var pointListCollapsed = false
+        binding.headerPointList.setOnClickListener {
+            pointListCollapsed = !pointListCollapsed
+            binding.layoutPointListBody.visibility = if (pointListCollapsed) View.GONE else View.VISIBLE
+            binding.tvPointListChevron.text = if (pointListCollapsed) "▼" else "▲"
+        }
+
         binding.btnApplyDelayToAll.setOnClickListener {
             val delay = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
             if (delay < 100) {
@@ -503,6 +511,7 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogLabel.setText(prefill.label)
             dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
             dialogBinding.etDialogVariance.setText(prefill.variance)
+            dialogBinding.etDialogCoordVariance.setText(prefill.coordVariance)
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
             if (prefill.pointRepeatModePos == 1) {
                 dialogBinding.rbPointRepeatTime.isChecked = true
@@ -615,6 +624,7 @@ class MainActivity : AppCompatActivity() {
                 val label = dialogBinding.etDialogLabel.text?.toString()?.trim().orEmpty()
                 val delayAfter = dialogBinding.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
                 val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                val coordVariance = dialogBinding.etDialogCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
                 val pointRepeat = dialogBinding.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
                 val pointRepeatMode = if (dialogBinding.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
                 val pointRepeatDurationValue = dialogBinding.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
@@ -714,6 +724,7 @@ class MainActivity : AppCompatActivity() {
                         swipeDurationMs = swipeMs,
                         trigger = trigger,
                         randomVarianceMs = variance,
+                        coordinateVariancePx = coordVariance,
                         pointRepeatCount = pointRepeat,
                         pointRepeatMode = pointRepeatMode,
                         pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L
@@ -739,6 +750,7 @@ class MainActivity : AppCompatActivity() {
         label          = d.etDialogLabel.text?.toString().orEmpty(),
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
+        coordVariance  = d.etDialogCoordVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
         pointRepeatModePos    = if (d.rbPointRepeatTime.isChecked) 1 else 0,
         pointRepeatDuration   = d.etDialogPointRepeatDuration.text?.toString().orEmpty(),

@@ -23,7 +23,12 @@
         <item name="android:textColor">@color/text_secondary</item>
         <item name="android:textAllCaps">true</item>
         <item name="android:letterSpacing">0.1</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:shadowColor">@android:color/transparent</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">0</item>
+        <item name="android:shadowRadius">0</item>
     </style>
 
     <!-- 카드 스타일 -->

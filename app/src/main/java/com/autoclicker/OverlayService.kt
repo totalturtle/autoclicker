@@ -58,6 +58,7 @@ class OverlayService : Service() {
     private var lastToggleMs          = 0L
     private var isEditMode            = false
     private var isDialogShowing       = false
+    private var isPanelCollapsed      = false
     private var pendingColorPickIndex = -1
     private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
@@ -207,6 +208,14 @@ class OverlayService : Service() {
             })
         }
 
+        overlayView.findViewById<Button>(R.id.btnOverlaySaveProfile).setOnClickListener {
+            showOverlaySaveProfileDialog()
+        }
+
+        overlayView.findViewById<Button>(R.id.btnOverlayLoadProfile).setOnClickListener {
+            showOverlayLoadProfileDialog()
+        }
+
         overlayView.findViewById<Button>(R.id.btnOverlayEditMode).setOnClickListener {
             setEditMode(!isEditMode)
         }
@@ -337,21 +346,44 @@ class OverlayService : Service() {
     private fun setupPanelDrag() {
         val handle = overlayView.findViewById<View>(R.id.overlayDragHandle)
         var startX = 0f; var startY = 0f; var initX = 0; var initY = 0
+        var wasDrag = false
+        val tapSlop = (resources.displayMetrics.density * 6).toInt()
 
         handle.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     startX = event.rawX; startY = event.rawY
-                    initX = panelParams.x; initY = panelParams.y; true
+                    initX = panelParams.x; initY = panelParams.y
+                    wasDrag = false; true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    panelParams.x = initX + (event.rawX - startX).toInt()
-                    panelParams.y = initY + (event.rawY - startY).toInt()
-                    runCatching { windowManager.updateViewLayout(overlayView, panelParams) }; true
+                    val dx = (event.rawX - startX).toInt()
+                    val dy = (event.rawY - startY).toInt()
+                    if (!wasDrag && (Math.abs(dx) > tapSlop || Math.abs(dy) > tapSlop)) wasDrag = true
+                    if (wasDrag) {
+                        panelParams.x = initX + dx
+                        panelParams.y = initY + dy
+                        runCatching { windowManager.updateViewLayout(overlayView, panelParams) }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!wasDrag) setPanelCollapsed(!isPanelCollapsed)
+                    true
                 }
                 else -> false
             }
         }
+    }
+
+    private fun setPanelCollapsed(collapsed: Boolean) {
+        isPanelCollapsed = collapsed
+        val topGroup    = overlayView.findViewById<View>(R.id.layoutCollapsibleTop)
+        val bottomGroup = overlayView.findViewById<View>(R.id.layoutCollapsibleBottom)
+        val handle      = overlayView.findViewById<TextView>(R.id.overlayDragHandle)
+        topGroup.visibility    = if (collapsed) View.GONE else View.VISIBLE
+        bottomGroup.visibility = if (collapsed) View.GONE else View.VISIBLE
+        handle.text = if (collapsed) "▷" else "· · ·"
     }
 
     // ── 마커 관리 ───────────────────────────────────────────────────────
@@ -592,6 +624,7 @@ class OverlayService : Service() {
         d.etDialogLabel.setText(point.label)
         if (point.delayAfterMs >= 0) d.etDialogDelayAfter.setText(point.delayAfterMs.toString())
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
+        if (point.coordinateVariancePx > 0) d.etDialogCoordVariance.setText(point.coordinateVariancePx.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
 
         // 반복 모드 UI 복원 (RadioGroup 버그 회피 — 개별 isChecked 직접 제어)
@@ -864,6 +897,7 @@ class OverlayService : Service() {
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
         val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
         val variance = d.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        val coordVariance = d.etDialogCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
         // 반복 모드/시간 읽기 — 개별 isChecked 직접 확인
@@ -937,7 +971,7 @@ class OverlayService : Service() {
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
             longPressDurationMs = longMs, swipeDurationMs = swipeMs,
-            trigger = newTrigger, randomVarianceMs = variance,
+            trigger = newTrigger, randomVarianceMs = variance, coordinateVariancePx = coordVariance,
             pointRepeatCount = pointRepeat,
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = pointRepeatDurationMs,
@@ -946,6 +980,65 @@ class OverlayService : Service() {
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
         SequencePrefs.save(this, cfg.copy(points = newPoints))
         refreshMarkers()
+    }
+
+    private fun showOverlaySaveProfileDialog() {
+        if (isDialogShowing) return
+        val cfg = SequencePrefs.load(this)
+        if (cfg == null || cfg.points.isEmpty()) {
+            Toast.makeText(this, "저장할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val input = android.widget.EditText(themedCtx).apply {
+            hint = "프로필 이름"
+            setSingleLine()
+            setPadding(48, 32, 48, 16)
+        }
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle("프로필 저장")
+            .setView(input)
+            .setNegativeButton("취소", null)
+            .setPositiveButton("저장") { _, _ ->
+                val name = input.text?.toString()?.trim()
+                if (name.isNullOrEmpty()) {
+                    Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
+                } else {
+                    ProfileManager.save(this, Profile(name = name, config = cfg))
+                    Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
+    }
+
+    private fun showOverlayLoadProfileDialog() {
+        if (isDialogShowing) return
+        val profiles = ProfileManager.loadAll(this)
+        if (profiles.isEmpty()) {
+            Toast.makeText(this, "저장된 프로필이 없습니다.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val names = profiles.map { it.name }.toTypedArray()
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle("프로필 불러오기")
+            .setItems(names) { _, which ->
+                val profile = profiles[which]
+                SequencePrefs.save(this, profile.config)
+                sequenceJson = profile.config.toJsonString()
+                refreshMarkers()
+                Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("취소", null)
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
     }
 
     private fun deletePointInOverlay(index: Int, cfg: ClickSequenceConfig) {
