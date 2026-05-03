@@ -121,8 +121,7 @@ class ProfileManagerActivity : AppCompatActivity() {
     }
 
     private fun showSaveDialog() {
-        val currentJson = intent.getStringExtra(EXTRA_CURRENT_CONFIG_JSON)
-        val config = ClickSequenceConfig.fromJsonString(currentJson)
+        val config = SequencePrefs.load(this)
         if (config == null || config.points.isEmpty()) {
             Toast.makeText(this, R.string.toast_no_points_to_save, Toast.LENGTH_SHORT).show()
             return

@@ -2,7 +2,7 @@ package com.autoclicker
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
-import android.app.AlertDialog
+import androidx.appcompat.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -413,11 +413,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnProfileManager.setOnClickListener {
-            val json = buildConfig()?.toJsonString()
-            val intent = Intent(this, ProfileManagerActivity::class.java).apply {
-                putExtra(ProfileManagerActivity.EXTRA_CURRENT_CONFIG_JSON, json)
-            }
-            profileManagerLauncher.launch(intent)
+            profileManagerLauncher.launch(Intent(this, ProfileManagerActivity::class.java))
         }
 
         binding.switchVolumeHotkey.setOnCheckedChangeListener { _, checked ->
