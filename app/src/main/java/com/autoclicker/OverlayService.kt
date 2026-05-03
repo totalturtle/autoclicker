@@ -682,6 +682,7 @@ class OverlayService : Service() {
             else                   -> 0
         }
         fun applyGestureUi(pos: Int) {
+            d.tilDialogTapDur.visibility  = if (pos == 0) View.VISIBLE else View.GONE
             d.groupSwipe.visibility       = if (pos == 2) View.VISIBLE else View.GONE
             d.tilDialogLongDur.visibility = if (pos == 1) View.VISIBLE else View.GONE
             if (pos == 2) {
@@ -697,6 +698,9 @@ class OverlayService : Service() {
         d.spinnerGesture.setSelection(gesturePos)
         applyGestureUi(gesturePos)
 
+        if (point.gesture == GestureType.TAP) {
+            d.etDialogTapDur.setText(point.tapDurationMs.toString())
+        }
         if (point.gesture == GestureType.SWIPE) {
             d.etDialogSwipeDur.setText(point.swipeDurationMs.toString())
             // 꺾임 개수 표시 (버튼 리스너는 dialog 생성 후 설정)
@@ -791,6 +795,7 @@ class OverlayService : Service() {
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
+        d.cbStopLoopOnExecute.isChecked = point.stopLoopOnExecute
         d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
@@ -913,10 +918,17 @@ class OverlayService : Service() {
         } else 0L
 
         var endX = x; var endY = y
+        var tapMs = original.tapDurationMs
         var longMs = original.longPressDurationMs
         var swipeMs = original.swipeDurationMs
 
         when (gesture) {
+            GestureType.TAP -> {
+                tapMs = d.etDialogTapDur.text?.toString()?.toLongOrNull() ?: 50L
+                if (tapMs < 1 || tapMs > 60_000) {
+                    Toast.makeText(this, "탭 지속 시간은 1~60000ms 입니다.", Toast.LENGTH_SHORT).show(); return
+                }
+            }
             GestureType.SWIPE -> {
                 endX  = d.etDialogEndX.text?.toString()?.toIntOrNull() ?: original.endX
                 endY  = d.etDialogEndY.text?.toString()?.toIntOrNull() ?: original.endY
@@ -970,12 +982,13 @@ class OverlayService : Service() {
         val updated = original.copy(
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
-            longPressDurationMs = longMs, swipeDurationMs = swipeMs,
+            tapDurationMs = tapMs, longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, randomVarianceMs = variance, coordinateVariancePx = coordVariance,
             pointRepeatCount = pointRepeat,
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = pointRepeatDurationMs,
-            swipeExtraPoints = freshExtras
+            swipeExtraPoints = freshExtras,
+            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
         )
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
         SequencePrefs.save(this, cfg.copy(points = newPoints))

@@ -151,6 +151,7 @@ class PointSettingsActivity : AppCompatActivity() {
         }
 
         fun applyGestureUi(pos: Int) {
+            d.tilDialogTapDur.visibility  = if (pos == 0) View.VISIBLE else View.GONE
             d.groupSwipe.visibility      = if (pos == 2) View.VISIBLE else View.GONE
             d.tilDialogLongDur.visibility = if (pos == 1) View.VISIBLE else View.GONE
         }
@@ -163,6 +164,9 @@ class PointSettingsActivity : AppCompatActivity() {
         d.spinnerGesture.setSelection(gesturePos)
         applyGestureUi(gesturePos)
 
+        if (point.gesture == GestureType.TAP) {
+            d.etDialogTapDur.setText(point.tapDurationMs.toString())
+        }
         if (point.gesture == GestureType.SWIPE) {
             d.etDialogEndX.setText(point.endX.toString())
             d.etDialogEndY.setText(point.endY.toString())
@@ -242,6 +246,8 @@ class PointSettingsActivity : AppCompatActivity() {
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
+
+        d.cbStopLoopOnExecute.isChecked = point.stopLoopOnExecute
         d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
@@ -298,10 +304,18 @@ class PointSettingsActivity : AppCompatActivity() {
         }
 
         var endX = x; var endY = y
+        var tapMs = original.tapDurationMs
         var longMs = original.longPressDurationMs
         var swipeMs = original.swipeDurationMs
 
         when (gesture) {
+            GestureType.TAP -> {
+                tapMs = d.etDialogTapDur.text?.toString()?.toLongOrNull() ?: 50L
+                if (tapMs < 1 || tapMs > 60_000) {
+                    Toast.makeText(this, "탭 지속 시간은 1~60000ms 입니다.", Toast.LENGTH_SHORT).show()
+                    return
+                }
+            }
             GestureType.SWIPE -> {
                 endX   = d.etDialogEndX.text?.toString()?.toIntOrNull() ?: original.endX
                 endY   = d.etDialogEndY.text?.toString()?.toIntOrNull() ?: original.endY
@@ -351,11 +365,12 @@ class PointSettingsActivity : AppCompatActivity() {
         val updated = original.copy(
             x = x, y = y, label = label, delayAfterMs = delayAfter,
             gesture = gesture, endX = endX, endY = endY,
-            longPressDurationMs = longMs, swipeDurationMs = swipeMs,
+            tapDurationMs = tapMs, longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, pointRepeatCount = pointRepeat,
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
-            swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList()
+            swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList(),
+            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
         )
 
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }

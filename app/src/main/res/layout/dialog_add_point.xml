@@ -682,5 +682,20 @@
 
         </LinearLayout>
 
+        <!-- 루프 종료 구분선 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="?android:attr/listDivider" />
+
+        <CheckBox
+            android:id="@+id/cbStopLoopOnExecute"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="이 포인트 동작 시 반복 루프 종료"
+            android:textColor="?android:attr/textColorPrimary" />
+
     </LinearLayout>
 </ScrollView>

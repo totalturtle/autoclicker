@@ -116,7 +116,11 @@ class AutoClickAccessibilityService : AccessibilityService() {
         event ?: return
         if (event.eventType != android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == packageName || pkg == lastDetectedPackage) return
+        if (pkg == packageName) {
+            lastDetectedPackage = ""
+            return
+        }
+        if (pkg == lastDetectedPackage) return
         lastDetectedPackage = pkg
 
         val profile = ProfileManager.findByApp(this, pkg) ?: return
@@ -183,14 +187,18 @@ class AutoClickAccessibilityService : AccessibilityService() {
                 System.currentTimeMillis() + config.repeatDurationMs else Long.MAX_VALUE
             var round = 0
             var totalClicks = 0
+            var stopLoopRequested = false
 
-            fun shouldContinueGlobal() = when (config.repeatMode) {
-                RepeatMode.COUNT    -> globalInfinite || round < config.repeatCount
-                RepeatMode.DURATION -> System.currentTimeMillis() < globalDeadline
+            fun shouldContinueGlobal(): Boolean {
+                if (stopLoopRequested) return false
+                return when (config.repeatMode) {
+                    RepeatMode.COUNT    -> globalInfinite || round < config.repeatCount
+                    RepeatMode.DURATION -> System.currentTimeMillis() < globalDeadline
+                }
             }
 
             try {
-                while (shouldContinueGlobal()) {
+                outer@ while (shouldContinueGlobal()) {
                     for (point in config.points) {
                         ensureActive()
                         if (!shouldContinueGlobal()) break
@@ -212,6 +220,10 @@ class AutoClickAccessibilityService : AccessibilityService() {
                                 totalClicks++
                                 broadcastCount(totalClicks)
                                 SessionLogger.logClick(point.label, point.x, point.y)
+                                if (point.stopLoopOnExecute) {
+                                    stopLoopRequested = true
+                                    break@outer
+                                }
                             } else {
                                 SessionLogger.logSkip(point.label, point.x, point.y)
                             }
@@ -222,7 +234,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     }
                     round++
                 }
-                if (!globalInfinite) broadcastStop()
+                if (!globalInfinite || stopLoopRequested) broadcastStop()
             } finally {
                 SessionLogger.endSession()
             }
@@ -269,7 +281,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
         val jx = jitter(p.x); val jy = jitter(p.y)
 
         when (p.gesture) {
-            GestureType.TAP -> dispatchStroke(jx, jy, jx, jy, 50L)
+            GestureType.TAP -> dispatchStroke(jx, jy, jx, jy, p.tapDurationMs.coerceIn(1L, 60_000L))
             GestureType.LONG_PRESS -> dispatchStroke(jx, jy, jx, jy, p.longPressDurationMs.coerceIn(100L, 60_000L))
             GestureType.SWIPE -> {
                 val dur = p.swipeDurationMs.coerceIn(50L, 60_000L)

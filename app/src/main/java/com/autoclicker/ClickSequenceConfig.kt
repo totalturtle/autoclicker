@@ -24,7 +24,9 @@ data class ClickPoint(
     val swipeExtraPoints: List<SwipeWaypoint> = emptyList(),
     val pointRepeatMode: RepeatMode = RepeatMode.COUNT,
     val pointRepeatDurationMs: Long = 0L,
-    val coordinateVariancePx: Int = 0
+    val coordinateVariancePx: Int = 0,
+    val tapDurationMs: Long = 50L,
+    val stopLoopOnExecute: Boolean = false
 )
 
 /**
@@ -66,6 +68,9 @@ data class ClickSequenceConfig(
                     if (p.gesture == GestureType.LONG_PRESS) {
                         put("ld", p.longPressDurationMs)
                     }
+                    if (p.gesture == GestureType.TAP && p.tapDurationMs != 50L) {
+                        put("td", p.tapDurationMs)
+                    }
                     if (p.trigger != null) {
                         put("trigger", JSONObject().apply {
                             put("cx", p.trigger.checkX)
@@ -88,6 +93,7 @@ data class ClickSequenceConfig(
                     }
                     if (p.randomVarianceMs > 0) put("rv", p.randomVarianceMs)
                     if (p.coordinateVariancePx > 0) put("cv", p.coordinateVariancePx)
+                    if (p.stopLoopOnExecute) put("sle", true)
                     if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
                     if (p.pointRepeatMode == RepeatMode.DURATION) {
                         put("prm", "d")
@@ -163,6 +169,8 @@ data class ClickSequenceConfig(
                                 pointRepeatMode = if (o.optString("prm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
                                 pointRepeatDurationMs = o.optLong("prd", 0L).coerceAtLeast(0L),
                                 coordinateVariancePx = o.optInt("cv", 0).coerceAtLeast(0),
+                                tapDurationMs = o.optLong("td", 50L).coerceIn(1L, 60_000L),
+                                stopLoopOnExecute = o.optBoolean("sle", false),
                                 swipeExtraPoints = if (o.has("swp")) {
                                     val arr = o.getJSONArray("swp")
                                     buildList { for (i in 0 until arr.length()) {

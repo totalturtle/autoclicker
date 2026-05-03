@@ -54,7 +54,8 @@ data class PointDialogState(
     val triggerRetryDelay: String = "500",
     val regionW: String = "",
     val regionH: String = "",
-    val regionThreshold: String = "90"
+    val regionThreshold: String = "90",
+    val stopLoopOnExecute: Boolean = false
 )
 
 /**
@@ -548,6 +549,7 @@ class MainActivity : AppCompatActivity() {
             }
             dialogBinding.cbTrigger.isChecked = prefill.triggerEnabled
             dialogBinding.groupTrigger.visibility = if (prefill.triggerEnabled) View.VISIBLE else View.GONE
+            dialogBinding.cbStopLoopOnExecute.isChecked = prefill.stopLoopOnExecute
             if (prefill.triggerModePos == 1) dialogBinding.rgTriggerMode.check(R.id.rbModeRegion)
             else dialogBinding.rgTriggerMode.check(R.id.rbModePixel)
             applyTriggerModeUi(prefill.triggerModePos)
@@ -751,7 +753,8 @@ class MainActivity : AppCompatActivity() {
                         coordinateVariancePx = coordVariance,
                         pointRepeatCount = pointRepeat,
                         pointRepeatMode = pointRepeatMode,
-                        pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L
+                        pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
+                        stopLoopOnExecute = dialogBinding.cbStopLoopOnExecute.isChecked
                     )
                 )
                 pointAdapter.notifyItemInserted(points.size - 1)
@@ -795,7 +798,8 @@ class MainActivity : AppCompatActivity() {
         regionW           = d.etRegionW.text?.toString().orEmpty(),
         regionH           = d.etRegionH.text?.toString().orEmpty(),
         regionThreshold   = d.etRegionThreshold.text?.toString().orEmpty(),
-        tapDur            = d.etDialogTapDur.text?.toString().orEmpty()
+        tapDur            = d.etDialogTapDur.text?.toString().orEmpty(),
+        stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
     )
 
     // ── 시퀀스 로드/저장 ────────────────────────────────────────────────
