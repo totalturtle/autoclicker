@@ -11,6 +11,8 @@
         <item name="android:windowBackground">@color/bg_dark</item>
         <item name="android:statusBarColor">@color/bg_dark</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <!-- TextInputLayout 색상 -->
         <item name="colorControlNormal">@color/text_hint</item>
         <item name="colorControlActivated">@color/primary</item>

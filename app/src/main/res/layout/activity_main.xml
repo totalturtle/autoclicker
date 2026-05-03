@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="@color/bg_dark">
 
     <!-- ── 상단 바 ── -->
@@ -21,7 +22,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="AutoClicker"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:fontFamily="sans-serif"
             android:textStyle="bold"
@@ -99,7 +100,7 @@
                     <Button
                         android:id="@+id/btnEnableAccessibility"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="wrap_content"
                         android:text="설정"
                         android:textSize="12sp"
                         android:paddingStart="12dp"
@@ -131,7 +132,7 @@
                     <Button
                         android:id="@+id/btnEnableOverlay"
                         android:layout_width="wrap_content"
-                        android:layout_height="32dp"
+                        android:layout_height="wrap_content"
                         android:text="설정"
                         android:textSize="12sp"
                         android:paddingStart="12dp"
@@ -419,18 +420,58 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- 딜레이/오차/반복 적용 버튼 행 -->
+                <!-- 딜레이오차 / 픽셀오차 입력 행 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginBottom="10dp">
 
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:hint="딜레이 오차 (ms)"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etVariance"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:text="0"
+                            android:textColor="@color/text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="픽셀 오차 (px)"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etCoordVariance"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:text="0"
+                            android:textColor="@color/text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <!-- 전체 적용 버튼 1행 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="6dp">
+
                     <Button
                         android:id="@+id/btnApplyDelayToAll"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="32dp"
+                        android:layout_height="wrap_content"
                         android:text="딜레이 전체 적용"
                         android:textSize="11sp"
                         android:paddingStart="4dp"
@@ -442,8 +483,27 @@
                         android:id="@+id/btnApplyVarianceToAll"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="32dp"
+                        android:layout_height="wrap_content"
                         android:text="오차 전체 적용"
+                        android:textSize="11sp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                </LinearLayout>
+
+                <!-- 전체 적용 버튼 2행 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="10dp">
+
+                    <Button
+                        android:id="@+id/btnApplyCoordVarianceToAll"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="픽셀오차 전체 적용"
                         android:textSize="11sp"
                         android:paddingStart="4dp"
                         android:paddingEnd="4dp"
@@ -454,29 +514,13 @@
                         android:id="@+id/btnApplyRepeat"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="32dp"
+                        android:layout_height="wrap_content"
                         android:text="반복 적용"
                         android:textSize="11sp"
                         android:paddingStart="4dp"
                         android:paddingEnd="4dp"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
-
-                <!-- 오차 입력 -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="10dp"
-                    android:hint="오차 (ms, 0=없음)"
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etVariance"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:text="0"
-                        android:textColor="@color/text_primary" />
-                </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- 볼륨 토글 -->
                 <com.google.android.material.switchmaterial.SwitchMaterial

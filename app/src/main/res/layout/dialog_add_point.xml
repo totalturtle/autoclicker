@@ -14,7 +14,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/hint_gesture_type"
-            android:textColor="#BBBBBB"
+            android:textColor="?android:attr/textColorSecondary"
             android:textSize="12sp"
             android:layout_marginBottom="4dp" />
 
@@ -134,7 +134,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="꺾임: 없음"
-                    android:textColor="#BBBBBB"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -161,6 +161,23 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilDialogTapDur"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="탭 지속 시간 (ms)"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etDialogTapDur"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:text="50" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilDialogLongDur"
@@ -196,45 +213,51 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:layout_marginTop="8dp">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:hint="딜레이 (ms)"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDialogDelayAfter"
-                    android:layout_width="match_parent"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="number" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:hint="딜레이 (ms)"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:hint="딜레이오차 (ms)"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etDialogDelayAfter"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDialogVariance"
-                    android:layout_width="match_parent"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="number" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:hint="딜레이 오차 (ms)"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etDialogVariance"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:hint="좌표 오차 (px)"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDialogCoordVariance"
@@ -271,7 +294,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="횟수 반복"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:checked="true" />
 
                     <RadioButton
@@ -280,7 +303,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
                         android:text="시간 반복"
-                        android:textColor="#FFFFFF" />
+                        android:textColor="?android:attr/textColorPrimary" />
                 </RadioGroup>
 
                 <TextView
@@ -289,7 +312,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:text="(다음 포인트로 넘어가기전에 반복하는 횟수/시간)"
-                    android:textColor="#8B949E"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="10sp" />
 
             </LinearLayout>
@@ -345,7 +368,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="초"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="13sp"
                         android:checked="true" />
 
@@ -354,7 +377,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="분"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="13sp" />
 
                     <RadioButton
@@ -362,7 +385,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="시"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?android:attr/textColorPrimary"
                         android:textSize="13sp" />
                 </RadioGroup>
             </LinearLayout>
@@ -374,14 +397,14 @@
             android:layout_height="1dp"
             android:layout_marginTop="12dp"
             android:layout_marginBottom="8dp"
-            android:background="#333333" />
+            android:background="?android:attr/listDivider" />
 
         <CheckBox
             android:id="@+id/cbTrigger"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/cb_trigger_enabled"
-            android:textColor="#FFFFFF" />
+            android:textColor="?android:attr/textColorPrimary" />
 
         <LinearLayout
             android:id="@+id/groupTrigger"
@@ -396,7 +419,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="트리거 유형"
-                android:textColor="#BBBBBB"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
 
             <RadioGroup
@@ -413,7 +436,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="색상 픽셀"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?android:attr/textColorPrimary"
                     android:checked="true" />
 
                 <RadioButton
@@ -422,7 +445,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="이미지 영역"
-                    android:textColor="#FFFFFF" />
+                    android:textColor="?android:attr/textColorPrimary" />
 
             </RadioGroup>
 
@@ -591,7 +614,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="캡처 없음"
-                    android:textColor="#888888"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="12sp" />
 
             </LinearLayout>
@@ -601,7 +624,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:text="@string/hint_trigger_action"
-                android:textColor="#BBBBBB"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
 
             <Spinner
@@ -654,7 +677,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/hint_trigger_api_note"
-                android:textColor="#888888"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="11sp" />
 
         </LinearLayout>

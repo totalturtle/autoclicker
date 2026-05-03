@@ -32,6 +32,7 @@ data class PointDialogState(
     val y: String = "",
     val endX: String = "",
     val endY: String = "",
+    val tapDur: String = "50",
     val swipeDur: String = "350",
     val longDur: String = "450",
     val label: String = "",
@@ -371,6 +372,19 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "오차 ${variance}ms 를 모든 포인트에 적용했습니다.", Toast.LENGTH_SHORT).show()
         }
 
+        binding.btnApplyCoordVarianceToAll.setOnClickListener {
+            val coordVariance = binding.etCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            syncPointsFromPrefs()
+            if (points.isEmpty()) {
+                Toast.makeText(this, "적용할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            points.replaceAll { it.copy(coordinateVariancePx = coordVariance) }
+            pointAdapter.notifyDataSetChanged()
+            persistSequence()
+            Toast.makeText(this, "픽셀 오차 ${coordVariance}px 를 모든 포인트에 적용했습니다.", Toast.LENGTH_SHORT).show()
+        }
+
         binding.btnApplyRepeat.setOnClickListener {
             persistSequence()
             val isDuration = binding.rbRepeatTime.isChecked
@@ -447,6 +461,7 @@ class MainActivity : AppCompatActivity() {
         val dialogBinding = DialogAddPointBinding.inflate(LayoutInflater.from(this))
 
         fun applyGestureUi(position: Int) {
+            dialogBinding.tilDialogTapDur.visibility = if (position == 0) View.VISIBLE else View.GONE
             dialogBinding.groupSwipe.visibility = if (position == 2) View.VISIBLE else View.GONE
             dialogBinding.tilDialogLongDur.visibility = if (position == 1) View.VISIBLE else View.GONE
         }
@@ -506,6 +521,7 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogY.setText(prefill.y)
             dialogBinding.etDialogEndX.setText(prefill.endX)
             dialogBinding.etDialogEndY.setText(prefill.endY)
+            if (prefill.tapDur.isNotEmpty()) dialogBinding.etDialogTapDur.setText(prefill.tapDur)
             if (prefill.swipeDur.isNotEmpty()) dialogBinding.etDialogSwipeDur.setText(prefill.swipeDur)
             if (prefill.longDur.isNotEmpty()) dialogBinding.etDialogLongDur.setText(prefill.longDur)
             dialogBinding.etDialogLabel.setText(prefill.label)
@@ -646,10 +662,17 @@ class MainActivity : AppCompatActivity() {
 
                 var endX = x
                 var endY = y
+                var tapMs = dialogBinding.etDialogTapDur.text?.toString()?.toLongOrNull() ?: 50L
                 var longMs = 450L
                 var swipeMs = 350L
 
                 when (gesture) {
+                    GestureType.TAP -> {
+                        if (tapMs < 1 || tapMs > 60_000) {
+                            Toast.makeText(this, "탭 지속 시간은 1~60000ms 입니다.", Toast.LENGTH_SHORT).show()
+                            return@setPositiveButton
+                        }
+                    }
                     GestureType.SWIPE -> {
                         val ex = dialogBinding.etDialogEndX.text?.toString()?.toIntOrNull()
                         val ey = dialogBinding.etDialogEndY.text?.toString()?.toIntOrNull()
@@ -722,6 +745,7 @@ class MainActivity : AppCompatActivity() {
                         endY = endY,
                         longPressDurationMs = longMs,
                         swipeDurationMs = swipeMs,
+                        tapDurationMs = tapMs,
                         trigger = trigger,
                         randomVarianceMs = variance,
                         coordinateVariancePx = coordVariance,
@@ -770,7 +794,8 @@ class MainActivity : AppCompatActivity() {
         triggerRetryDelay = d.etTriggerRetryDelay.text?.toString().orEmpty(),
         regionW           = d.etRegionW.text?.toString().orEmpty(),
         regionH           = d.etRegionH.text?.toString().orEmpty(),
-        regionThreshold   = d.etRegionThreshold.text?.toString().orEmpty()
+        regionThreshold   = d.etRegionThreshold.text?.toString().orEmpty(),
+        tapDur            = d.etDialogTapDur.text?.toString().orEmpty()
     )
 
     // ── 시퀀스 로드/저장 ────────────────────────────────────────────────
