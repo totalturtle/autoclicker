@@ -2,6 +2,9 @@ package com.autoclicker
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.annotation.SuppressLint
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,6 +16,7 @@ import android.os.SystemClock
 import android.view.Display
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import kotlin.coroutines.resume
@@ -61,9 +65,11 @@ class AutoClickAccessibilityService : AccessibilityService() {
     val isClickJobActive: Boolean get() = clickJob?.isActive == true
 
     private var lastDetectedPackage = ""
+    private var lastPolledPackage = ""
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var clickJob: Job? = null
+    private var pollingJob: Job? = null
     private var lastVolumeToggleUptime = 0L
 
     private val commandReceiver = object : BroadcastReceiver() {
@@ -97,6 +103,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        startAppPolling()
 
         val filter = IntentFilter().apply {
             addAction(ACTION_START)
@@ -114,8 +121,15 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
-        if (event.eventType != android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
+        val pkg: String = when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
+                event.packageName?.toString() ?: return
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED ->
+                windows?.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                    ?.maxByOrNull { it.layer }
+                    ?.root?.packageName?.toString() ?: return
+            else -> return
+        }
         if (pkg == packageName) {
             lastDetectedPackage = ""
             return
@@ -125,6 +139,10 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
         val profile = ProfileManager.findByApp(this, pkg) ?: return
         SequencePrefs.save(this, profile.config)
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, OverlayService::class.java).apply { action = OverlayService.ACTION_AUTO_SHOW }
+        )
         sendBroadcast(Intent(ACTION_AUTO_PROFILE).apply {
             setPackage(packageName)
             putExtra(EXTRA_PROFILE_NAME, profile.name)
@@ -158,8 +176,50 @@ class AutoClickAccessibilityService : AccessibilityService() {
         super.onDestroy()
         instance = null
         stopClicking()
+        pollingJob?.cancel()
         runCatching { unregisterReceiver(commandReceiver) }
         serviceScope.cancel()
+    }
+
+    private fun startAppPolling() {
+        pollingJob?.cancel()
+        pollingJob = serviceScope.launch {
+            while (isActive) {
+                delay(2000L)
+                val pkg = getForegroundPackage() ?: continue
+                if (pkg == packageName || pkg == lastPolledPackage) continue
+                lastPolledPackage = pkg
+                val profile = ProfileManager.findByApp(this@AutoClickAccessibilityService, pkg) ?: continue
+                SequencePrefs.save(this@AutoClickAccessibilityService, profile.config)
+                ContextCompat.startForegroundService(
+                    this@AutoClickAccessibilityService,
+                    Intent(this@AutoClickAccessibilityService, OverlayService::class.java).apply {
+                        action = OverlayService.ACTION_AUTO_SHOW
+                    }
+                )
+                sendBroadcast(Intent(ACTION_AUTO_PROFILE).apply {
+                    setPackage(packageName)
+                    putExtra(EXTRA_PROFILE_NAME, profile.name)
+                })
+            }
+        }
+    }
+
+    private fun getForegroundPackage(): String? {
+        val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return null
+        val now = System.currentTimeMillis()
+        val events = usm.queryEvents(now - 5_000L, now)
+        var lastPkg: String? = null
+        var lastTime = 0L
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND && event.timeStamp > lastTime) {
+                lastTime = event.timeStamp
+                lastPkg = event.packageName
+            }
+        }
+        return lastPkg
     }
 
     private fun toggleRun() {

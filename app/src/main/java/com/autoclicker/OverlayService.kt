@@ -46,6 +46,7 @@ class OverlayService : Service() {
     companion object {
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
         const val ACTION_TOGGLE_MARKERS = "com.autoclicker.OVERLAY_TOGGLE_MARKERS"
+        const val ACTION_AUTO_SHOW = "com.autoclicker.OVERLAY_AUTO_SHOW"
         private const val CHANNEL_ID  = "overlay_channel"
         private const val NOTIF_ID    = 1001
     }
@@ -166,6 +167,7 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_AUTO_SHOW) markersVisible = true
         refreshMarkers()
         return START_STICKY
     }
