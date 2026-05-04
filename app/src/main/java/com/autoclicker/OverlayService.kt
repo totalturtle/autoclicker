@@ -196,7 +196,9 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 16; y = 200
+            val dm = resources.displayMetrics
+            x = dm.widthPixels - (52 * dm.density).toInt() - (12 * dm.density).toInt()
+            y = dm.heightPixels / 2 - (150 * dm.density).toInt()
         }
 
         windowManager.addView(overlayView, panelParams)
