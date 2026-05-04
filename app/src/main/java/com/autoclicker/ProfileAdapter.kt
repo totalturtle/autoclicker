@@ -1,17 +1,25 @@
 package com.autoclicker
 
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.autoclicker.databinding.ItemProfileBinding
 
 class ProfileAdapter(
-    private val profiles: List<Profile>,
+    private val profiles: MutableList<Profile>,
     private val onLoad: (Profile) -> Unit,
     private val onExport: (Profile) -> Unit,
     private val onSetApp: (Profile) -> Unit,
-    private val onDelete: (Profile) -> Unit
+    private val onDelete: (Profile) -> Unit,
+    private val onStartDrag: (RecyclerView.ViewHolder) -> Unit
 ) : RecyclerView.Adapter<ProfileAdapter.VH>() {
+
+    fun moveItem(from: Int, to: Int) {
+        val item = profiles.removeAt(from)
+        profiles.add(to, item)
+        notifyItemMoved(from, to)
+    }
 
     inner class VH(val binding: ItemProfileBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(p: Profile) {
@@ -24,6 +32,10 @@ class ProfileAdapter(
             binding.btnProfileExport.setOnClickListener { onExport(p) }
             binding.btnProfileSetApp.setOnClickListener { onSetApp(p) }
             binding.btnProfileDelete.setOnClickListener { onDelete(p) }
+            binding.ivProfileDragHandle.setOnTouchListener { _, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) onStartDrag(this)
+                false
+            }
         }
     }
 

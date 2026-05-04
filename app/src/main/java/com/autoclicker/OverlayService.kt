@@ -164,10 +164,13 @@ class OverlayService : Service() {
             registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
         else
             registerReceiver(receiver, filter)
+
+        // 기본 상태: 패널 최소화 + 마커 숨김
+        setPanelCollapsed(true)
+        setMarkersVisible(false)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_AUTO_SHOW) markersVisible = true
         refreshMarkers()
         return START_STICKY
     }
@@ -621,6 +624,10 @@ class OverlayService : Service() {
         d.btnPickEnd.visibility     = View.GONE
         d.btnPickTrigger.visibility = View.GONE
 
+        // 순서 변경 필드
+        d.tvPointOrderLabel.text = "순서 변경 (현재: ${index + 1} / 전체: ${cfg.points.size}개)"
+        d.etPointOrder.setText((index + 1).toString())
+
         d.etDialogX.setText(point.x.toString())
         d.etDialogY.setText(point.y.toString())
         d.etDialogLabel.setText(point.label)
@@ -992,7 +999,15 @@ class OverlayService : Service() {
             swipeExtraPoints = freshExtras,
             stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
         )
+        val inputText = d.etPointOrder.text?.toString()?.trim()
+        val targetPos = (inputText?.toIntOrNull() ?: (index + 1))
+            .coerceIn(1, cfg.points.size) - 1
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
+        if (targetPos != index) {
+            newPoints.removeAt(index)
+            newPoints.add(targetPos, updated)
+            Toast.makeText(this, "${index + 1}번 → ${targetPos + 1}번으로 이동", Toast.LENGTH_SHORT).show()
+        }
         SequencePrefs.save(this, cfg.copy(points = newPoints))
         refreshMarkers()
     }

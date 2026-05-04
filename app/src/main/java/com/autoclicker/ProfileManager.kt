@@ -39,6 +39,8 @@ object ProfileManager {
         }.getOrDefault(emptyList())
     }
 
+    fun saveOrder(context: Context, profiles: List<Profile>) = saveAll(context, profiles)
+
     private fun saveAll(context: Context, profiles: List<Profile>) {
         val arr = JSONArray()
         for (p in profiles) {

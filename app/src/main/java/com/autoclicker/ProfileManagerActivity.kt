@@ -8,7 +8,9 @@ import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.autoclicker.databinding.ActivityProfileManagerBinding
 import com.autoclicker.databinding.DialogSaveProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -23,6 +25,7 @@ class ProfileManagerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProfileManagerBinding
     private val profiles = mutableListOf<Profile>()
     private lateinit var adapter: ProfileAdapter
+    private lateinit var itemTouchHelper: ItemTouchHelper
 
     private var pendingExportProfile: Profile? = null
 
@@ -93,11 +96,27 @@ class ProfileManagerActivity : AppCompatActivity() {
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
-            }
+            },
+            onStartDrag = { vh -> itemTouchHelper.startDrag(vh) }
         )
+
+        itemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
+        ) {
+            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
+                adapter.moveItem(vh.adapterPosition, target.adapterPosition)
+                return true
+            }
+            override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
+            override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
+                super.clearView(rv, vh)
+                ProfileManager.saveOrder(this@ProfileManagerActivity, profiles)
+            }
+        })
 
         binding.rvProfiles.layoutManager = LinearLayoutManager(this)
         binding.rvProfiles.adapter = adapter
+        itemTouchHelper.attachToRecyclerView(binding.rvProfiles)
 
         binding.btnSaveCurrentProfile.setOnClickListener { showSaveDialog() }
         binding.btnImportProfile.setOnClickListener {

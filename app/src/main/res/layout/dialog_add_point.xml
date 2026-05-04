@@ -10,6 +10,31 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- 순서 변경 (포인트 설정에서만 표시) -->
+        <LinearLayout
+            android:id="@+id/layoutPointOrder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/tvPointOrderLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:layout_marginBottom="6dp" />
+
+            <EditText
+                android:id="@+id/etPointOrder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:padding="10dp" />
+
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

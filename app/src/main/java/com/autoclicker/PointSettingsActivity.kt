@@ -84,6 +84,12 @@ class PointSettingsActivity : AppCompatActivity() {
         d.btnPickTrigger.visibility = View.GONE
         d.btnPickColor.visibility   = View.GONE
 
+        // 순서 변경 필드
+        d.root.findViewById<android.widget.TextView>(R.id.tvPointOrderLabel)
+            ?.text = "순서 변경 (현재: ${index + 1} / 전체: ${cfg.points.size}개)"
+        d.root.findViewById<android.widget.EditText>(R.id.etPointOrder)
+            ?.setText((index + 1).toString())
+
         // 트리거 모드 UI 토글
         fun applyTriggerModeUi(modePos: Int) {
             d.groupTriggerPixel.visibility  = if (modePos == 0) View.VISIBLE else View.GONE
@@ -373,7 +379,16 @@ class PointSettingsActivity : AppCompatActivity() {
             stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
         )
 
+        val inputText = d.root.findViewById<android.widget.EditText>(R.id.etPointOrder)
+            ?.text?.toString()?.trim()
+        val targetPos = (inputText?.toIntOrNull() ?: (index + 1))
+            .coerceIn(1, cfg.points.size) - 1
         val newPoints = cfg.points.toMutableList().also { it[index] = updated }
+        if (targetPos != index) {
+            newPoints.removeAt(index)
+            newPoints.add(targetPos, updated)
+            Toast.makeText(this, "${index + 1}번 → ${targetPos + 1}번으로 이동", Toast.LENGTH_SHORT).show()
+        }
         SequencePrefs.save(this, cfg.copy(points = newPoints))
         notifyUpdated()
     }

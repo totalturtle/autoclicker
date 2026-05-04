@@ -456,6 +456,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val dialogBinding = DialogAddPointBinding.inflate(LayoutInflater.from(this))
+        dialogBinding.layoutPointOrder.visibility = View.GONE
 
         fun applyGestureUi(position: Int) {
             dialogBinding.tilDialogTapDur.visibility = if (position == 0) View.VISIBLE else View.GONE
