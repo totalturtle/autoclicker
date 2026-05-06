@@ -1,6 +1,7 @@
 package com.autoclicker
 
 import android.content.Context
+import android.content.Intent
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -197,7 +198,7 @@ data class ClickSequenceConfig(
 object SequencePrefs {
     private const val NAME = "click_sequence_prefs"
     private const val KEY_CONFIG = "config_json"
-    private const val KEY_VOLUME_HOTKEY = "volume_hotkey"
+    const val ACTION_POINTS_CHANGED = "com.autoclicker.ACTION_POINTS_CHANGED"
 
     fun loadRawJson(context: Context): String? =
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).getString(KEY_CONFIG, null)
@@ -209,15 +210,8 @@ object SequencePrefs {
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_CONFIG, config.toJsonString())
             .apply()
+        context.sendBroadcast(Intent(ACTION_POINTS_CHANGED).apply { setPackage(context.packageName) })
     }
 
-    fun isVolumeHotkeyEnabled(context: Context): Boolean =
-        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_VOLUME_HOTKEY, false)
 
-    fun setVolumeHotkeyEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_VOLUME_HOTKEY, enabled)
-            .apply()
-    }
 }

@@ -25,8 +25,6 @@
     <string name="overlay_click_fmt">Clicks: %d</string>
 
     <string name="section_quick_toggle">Quick Toggle</string>
-    <string name="switch_volume_hotkey">Volume-Down key to toggle</string>
-    <string name="hint_volume_hotkey">When enabled, the Volume Down key toggles the sequence instead of changing volume. Restart the accessibility service after changing this setting.</string>
     <string name="hint_qs_tile">Add the AutoClicker tile from the Quick Settings edit panel to toggle the same way.</string>
     <string name="tile_label">AutoClick</string>
 

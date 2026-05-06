@@ -24,8 +24,6 @@
     <string name="overlay_click_fmt">클릭: %d</string>
 
     <string name="section_quick_toggle">빠른 시작/정지</string>
-    <string name="switch_volume_hotkey">볼륨 아래 키로 토글</string>
-    <string name="hint_volume_hotkey">켜면 볼륨 다운 키가 시퀀스 시작/정지로 동작하고, 해당 키로는 음량이 바뀌지 않습니다. 접근성 설정 변경 후 서비스를 한 번 껐다 켜 주세요.</string>
     <string name="hint_qs_tile">알림 패널을 펼친 뒤 연필(편집)에서 오토클릭 타일을 추가하면 같은 방식으로 토글할 수 있습니다.</string>
     <string name="tile_label">오토클릭</string>
 

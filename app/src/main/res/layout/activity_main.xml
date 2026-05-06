@@ -522,14 +522,7 @@
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                 </LinearLayout>
 
-                <!-- 볼륨 토글 -->
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchVolumeHotkey"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/switch_volume_hotkey"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+
             </LinearLayout>
 
             <!-- ── 하단 아이콘 버튼 행 ── -->

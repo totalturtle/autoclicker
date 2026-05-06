@@ -70,7 +70,6 @@ class AutoClickAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var clickJob: Job? = null
     private var pollingJob: Job? = null
-    private var lastVolumeToggleUptime = 0L
 
     private val commandReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -153,24 +152,6 @@ class AutoClickAccessibilityService : AccessibilityService() {
         stopClicking()
     }
 
-    override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (event.action != KeyEvent.ACTION_DOWN) {
-            return super.onKeyEvent(event)
-        }
-        if (!SequencePrefs.isVolumeHotkeyEnabled(this)) {
-            return super.onKeyEvent(event)
-        }
-        if (event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
-            return super.onKeyEvent(event)
-        }
-        val now = SystemClock.uptimeMillis()
-        if (now - lastVolumeToggleUptime < 450L) {
-            return true
-        }
-        lastVolumeToggleUptime = now
-        toggleRun()
-        return true
-    }
 
     override fun onDestroy() {
         super.onDestroy()

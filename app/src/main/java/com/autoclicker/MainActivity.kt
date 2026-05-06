@@ -122,6 +122,9 @@ class MainActivity : AppCompatActivity() {
                 AutoClickAccessibilityService.ACTION_STARTED -> {
                     setRunningState(true)
                 }
+                SequencePrefs.ACTION_POINTS_CHANGED -> {
+                    syncPointsFromPrefs()
+                }
                 AutoClickAccessibilityService.ACTION_AUTO_PROFILE -> {
                     val name = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_PROFILE_NAME) ?: return
                     val cfg = SequencePrefs.load(this@MainActivity) ?: return
@@ -179,7 +182,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        SequencePrefs.setVolumeHotkeyEnabled(this, binding.switchVolumeHotkey.isChecked)
         persistSequence()
     }
 
@@ -414,10 +416,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnProfileManager.setOnClickListener {
             profileManagerLauncher.launch(Intent(this, ProfileManagerActivity::class.java))
-        }
-
-        binding.switchVolumeHotkey.setOnCheckedChangeListener { _, checked ->
-            SequencePrefs.setVolumeHotkeyEnabled(this, checked)
         }
 
         binding.btnToggleOverlay.setOnClickListener {
@@ -816,7 +814,6 @@ class MainActivity : AppCompatActivity() {
             binding.layoutRepeatCount.visibility = View.VISIBLE
             binding.layoutRepeatDuration.visibility = View.GONE
         }
-        binding.switchVolumeHotkey.isChecked = SequencePrefs.isVolumeHotkeyEnabled(this)
         pointAdapter.notifyDataSetChanged()
     }
 
@@ -1016,6 +1013,7 @@ class MainActivity : AppCompatActivity() {
             addAction(AutoClickAccessibilityService.ACTION_AUTO_PROFILE)
             addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
             addAction(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
+            addAction(SequencePrefs.ACTION_POINTS_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
