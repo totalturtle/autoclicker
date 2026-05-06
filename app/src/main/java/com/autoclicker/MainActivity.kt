@@ -125,6 +125,10 @@ class MainActivity : AppCompatActivity() {
                 SequencePrefs.ACTION_POINTS_CHANGED -> {
                     syncPointsFromPrefs()
                 }
+                RecordingService.ACTION_RECORDING_DONE -> {
+                    val json = intent.getStringExtra(RecordingService.EXTRA_RECORDED_POINTS) ?: return
+                    onRecordingDone(json)
+                }
                 AutoClickAccessibilityService.ACTION_AUTO_PROFILE -> {
                     val name = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_PROFILE_NAME) ?: return
                     val cfg = SequencePrefs.load(this@MainActivity) ?: return
@@ -336,6 +340,7 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
+        binding.btnRecordPoints.setOnClickListener { startRecording() }
         binding.btnAddPoint.setOnClickListener { addPointDirect() }
 
         var pointListCollapsed = false
@@ -444,6 +449,34 @@ class MainActivity : AppCompatActivity() {
         binding.rbUnitMin.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitHour.isChecked = false } }
         binding.rbUnitHour.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitMin.isChecked = false } }
 
+    }
+
+    private fun startRecording() {
+        startService(Intent(this, RecordingService::class.java))
+        moveTaskToBack(true)
+    }
+
+    private fun onRecordingDone(json: String) {
+        val arr = org.json.JSONArray(json)
+        val newPoints = (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            val gesture = runCatching { GestureType.valueOf(obj.getString("gesture")) }.getOrDefault(GestureType.TAP)
+            ClickPoint(
+                x = obj.getInt("x"),
+                y = obj.getInt("y"),
+                gesture = gesture,
+                endX = obj.optInt("endX", obj.getInt("x")),
+                endY = obj.optInt("endY", obj.getInt("y")),
+                longPressDurationMs = obj.optLong("longPressDurationMs", 450L),
+                swipeDurationMs = obj.optLong("swipeDurationMs", 350L),
+                delayAfterMs = obj.optLong("delayAfterMs", 0L)
+            )
+        }
+        if (newPoints.isEmpty()) return
+        points.addAll(newPoints)
+        pointAdapter.notifyDataSetChanged()
+        persistSequence()
+        Toast.makeText(this, "${newPoints.size}개 포인트 녹화 완료", Toast.LENGTH_SHORT).show()
     }
 
     private fun addPointDirect() {
@@ -1025,6 +1058,7 @@ class MainActivity : AppCompatActivity() {
             addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
             addAction(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
             addAction(SequencePrefs.ACTION_POINTS_CHANGED)
+            addAction(RecordingService.ACTION_RECORDING_DONE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)

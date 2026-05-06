@@ -226,6 +226,17 @@
                         android:contentDescription="좌표 오버레이 토글" />
 
                     <Button
+                        android:id="@+id/btnRecordPoints"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="● 녹화"
+                        android:textSize="13sp"
+                        android:textColor="#E53935"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                    <Button
                         android:id="@+id/btnAddPoint"
                         android:layout_width="wrap_content"
                         android:layout_height="36dp"
