@@ -102,6 +102,7 @@ class OverlayService : Service() {
                     refreshMarkers()
                 }
                 PointSettingsActivity.ACTION_POINT_UPDATED -> refreshMarkers()
+                SequencePrefs.ACTION_POINTS_CHANGED -> refreshMarkers()
                 ACTION_TOGGLE_MARKERS -> setMarkersVisible(!markersVisible)
                 AutoClickAccessibilityService.ACTION_COLOR_SAMPLED -> {
                     val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET) ?: return
@@ -158,6 +159,7 @@ class OverlayService : Service() {
             addAction(AutoClickAccessibilityService.ACTION_COLOR_SAMPLED)
             addAction(AutoClickAccessibilityService.ACTION_REGION_CAPTURED)
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
+            addAction(SequencePrefs.ACTION_POINTS_CHANGED)
             addAction(ACTION_TOGGLE_MARKERS)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)

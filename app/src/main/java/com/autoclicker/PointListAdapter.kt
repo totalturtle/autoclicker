@@ -88,9 +88,7 @@ class PointListAdapter(
         if (from == to) return
         val item = points.removeAt(from)
         points.add(to, item)
-        notifyItemMoved(from, to)
-        val start = minOf(from, to)
-        notifyItemRangeChanged(start, points.size - start)
+        notifyDataSetChanged()
         onListChanged()
     }
 
