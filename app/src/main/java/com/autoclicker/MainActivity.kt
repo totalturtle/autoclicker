@@ -336,7 +336,7 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
-        binding.btnAddPoint.setOnClickListener { showAddPointDialog() }
+        binding.btnAddPoint.setOnClickListener { addPointDirect() }
 
         var pointListCollapsed = false
         binding.headerPointList.setOnClickListener {
@@ -444,6 +444,17 @@ class MainActivity : AppCompatActivity() {
         binding.rbUnitMin.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitHour.isChecked = false } }
         binding.rbUnitHour.setOnCheckedChangeListener { _, c -> if (c) { binding.rbUnitSec.isChecked = false; binding.rbUnitMin.isChecked = false } }
 
+    }
+
+    private fun addPointDirect() {
+        if (points.size >= 50) return
+        val dm = resources.displayMetrics
+        val cx = dm.widthPixels / 2
+        val cy = dm.heightPixels / 3
+        val newPoint = ClickPoint(x = cx, y = cy)
+        points.add(newPoint)
+        pointAdapter.notifyItemInserted(points.size - 1)
+        persistSequence()
     }
 
     // ── 포인트 추가 다이얼로그 ───────────────────────────────────────────
