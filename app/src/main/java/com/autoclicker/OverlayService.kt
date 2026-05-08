@@ -433,6 +433,15 @@ class OverlayService : Service() {
 
     private fun addNewPoint() {
         val cfg = SequencePrefs.load(this) ?: ClickSequenceConfig(emptyList(), 1000L, 0)
+        if (!PremiumManager.isPremium && cfg.points.size >= PremiumManager.FREE_POINT_LIMIT) {
+            // 오버레이에서는 MainActivity로 이동해서 구매 다이얼로그 표시
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("show_premium_dialog", true)
+            }
+            startActivity(intent)
+            return
+        }
         if (cfg.points.size >= 50) return
 
         val dm = resources.displayMetrics
@@ -806,9 +815,21 @@ class OverlayService : Service() {
         }
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
+            if (checked && !PremiumManager.isPremium) {
+                d.cbTrigger.isChecked = false
+                d.groupTrigger.visibility = View.GONE
+                android.widget.Toast.makeText(this, "🔒 프리미엄 기능입니다. 설정 > 프리미엄 구매에서 이용하세요.", android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnCheckedChangeListener
+            }
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
         d.cbStopLoopOnExecute.isChecked = point.stopLoopOnExecute
+        d.cbStopLoopOnExecute.setOnCheckedChangeListener { _, checked ->
+            if (checked && !PremiumManager.isPremium) {
+                d.cbStopLoopOnExecute.isChecked = false
+                android.widget.Toast.makeText(this, "🔒 프리미엄 기능입니다. 설정 > 프리미엄 구매에서 이용하세요.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
         d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
@@ -959,7 +980,7 @@ class OverlayService : Service() {
             else -> Unit
         }
 
-        val newTrigger = if (d.cbTrigger.isChecked) {
+        val newTrigger = if (d.cbTrigger.isChecked && PremiumManager.isPremium) {
             val cx = d.etTriggerX.text?.toString()?.toIntOrNull()
             val cy = d.etTriggerY.text?.toString()?.toIntOrNull()
             if (cx == null || cy == null) original.trigger
@@ -1001,7 +1022,7 @@ class OverlayService : Service() {
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = pointRepeatDurationMs,
             swipeExtraPoints = freshExtras,
-            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
+            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked && PremiumManager.isPremium
         )
         val inputText = d.etPointOrder.text?.toString()?.trim()
         val targetPos = (inputText?.toIntOrNull() ?: (index + 1))

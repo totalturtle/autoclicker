@@ -163,8 +163,15 @@ class PointSettingsActivity : AppCompatActivity() {
         }
 
         d.spinnerGesture.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) =
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                // position 2 = 스와이프 → 프리미엄 전용
+                if (position == 2 && !PremiumManager.isPremium) {
+                    d.spinnerGesture.setSelection(gesturePos)
+                    showPremiumToast()
+                    return
+                }
                 applyGestureUi(position)
+            }
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
         d.spinnerGesture.setSelection(gesturePos)
@@ -250,10 +257,22 @@ class PointSettingsActivity : AppCompatActivity() {
         })
 
         d.cbTrigger.setOnCheckedChangeListener { _, checked ->
+if (checked && !PremiumManager.isPremium) {
+                d.cbTrigger.isChecked = false
+                d.groupTrigger.visibility = View.GONE
+                showPremiumToast()
+                return@setOnCheckedChangeListener
+            }
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
         }
 
         d.cbStopLoopOnExecute.isChecked = point.stopLoopOnExecute
+        d.cbStopLoopOnExecute.setOnCheckedChangeListener { _, checked ->
+            if (checked && !PremiumManager.isPremium) {
+                d.cbStopLoopOnExecute.isChecked = false
+                showPremiumToast()
+            }
+        }
         d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
         }
@@ -341,7 +360,7 @@ class PointSettingsActivity : AppCompatActivity() {
             else -> Unit
         }
 
-        val newTrigger = if (d.cbTrigger.isChecked) {
+        val newTrigger = if (d.cbTrigger.isChecked && PremiumManager.isPremium) {
             val cx = d.etTriggerX.text?.toString()?.toIntOrNull()
             val cy = d.etTriggerY.text?.toString()?.toIntOrNull()
             if (cx == null || cy == null) { original.trigger }
@@ -376,7 +395,7 @@ class PointSettingsActivity : AppCompatActivity() {
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
             swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList(),
-            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked
+            stopLoopOnExecute = d.cbStopLoopOnExecute.isChecked && PremiumManager.isPremium
         )
 
         val inputText = d.root.findViewById<android.widget.EditText>(R.id.etPointOrder)
@@ -401,5 +420,9 @@ class PointSettingsActivity : AppCompatActivity() {
 
     private fun notifyUpdated() {
         sendBroadcast(Intent(ACTION_POINT_UPDATED).apply { setPackage(packageName) })
+    }
+
+    private fun showPremiumToast() {
+        Toast.makeText(this, "🔒 프리미엄 기능입니다. 설정 > 프리미엄 구매에서 이용하세요.", Toast.LENGTH_SHORT).show()
     }
 }

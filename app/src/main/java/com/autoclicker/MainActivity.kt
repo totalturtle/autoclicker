@@ -176,6 +176,13 @@ class MainActivity : AppCompatActivity() {
         showFirstRunGuideIfNeeded()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra("show_premium_dialog", false)) {
+            showPremiumDialog()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
@@ -340,7 +347,10 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
-        binding.btnRecordPoints.setOnClickListener { startRecording() }
+        binding.btnRecordPoints.setOnClickListener {
+            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
+            startRecording()
+        }
         binding.btnAddPoint.setOnClickListener { addPointDirect() }
 
         var pointListCollapsed = false
@@ -368,6 +378,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnApplyVarianceToAll.setOnClickListener {
+            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
             val variance = binding.etVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
             syncPointsFromPrefs()
             if (points.isEmpty()) {
@@ -381,6 +392,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnApplyCoordVarianceToAll.setOnClickListener {
+            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
             val coordVariance = binding.etCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             syncPointsFromPrefs()
             if (points.isEmpty()) {
@@ -420,6 +432,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnProfileManager.setOnClickListener {
+            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
             profileManagerLauncher.launch(Intent(this, ProfileManagerActivity::class.java))
         }
 
@@ -451,6 +464,30 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    fun showPremiumDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("🔒 프리미엄 기능")
+            .setMessage(
+                "이 기능은 프리미엄 버전에서 사용할 수 있습니다.\n\n" +
+                "✅ 스와이프 제스처\n" +
+                "✅ 색상 트리거\n" +
+                "✅ 포인트 무제한 (무료: 3개)\n" +
+                "✅ 프로필 저장/불러오기\n" +
+                "✅ 터치 녹화\n" +
+                "✅ 딜레이/픽셀 오차 설정\n\n" +
+                "₩4,900 일회 결제로 모든 기능을 영구적으로 이용하세요."
+            )
+            .setPositiveButton("구매하기") { _, _ ->
+                PremiumManager.launchPurchase(this) { success ->
+                    if (success) {
+                        Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+    }
+
     private fun startRecording() {
         startService(Intent(this, RecordingService::class.java))
         moveTaskToBack(true)
@@ -480,6 +517,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addPointDirect() {
+        if (!PremiumManager.isPremium && points.size >= PremiumManager.FREE_POINT_LIMIT) {
+            showPremiumDialog(); return
+        }
         if (points.size >= 50) return
         val dm = resources.displayMetrics
         val cx = dm.widthPixels / 2
@@ -519,7 +559,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialogBinding.cbTrigger.setOnCheckedChangeListener { _, checked ->
+            if (checked && !PremiumManager.isPremium) {
+                dialogBinding.cbTrigger.isChecked = false
+                dialogBinding.groupTrigger.visibility = View.GONE
+                showPremiumDialog()
+                return@setOnCheckedChangeListener
+            }
             dialogBinding.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+        dialogBinding.cbStopLoopOnExecute.setOnCheckedChangeListener { _, checked ->
+            if (checked && !PremiumManager.isPremium) {
+                dialogBinding.cbStopLoopOnExecute.isChecked = false
+                showPremiumDialog()
+            }
         }
         dialogBinding.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
             applyTriggerModeUi(if (checkedId == R.id.rbModeRegion) 1 else 0)
@@ -739,7 +791,7 @@ class MainActivity : AppCompatActivity() {
                     else -> Unit
                 }
 
-                val trigger = if (dialogBinding.cbTrigger.isChecked) {
+                val trigger = if (dialogBinding.cbTrigger.isChecked && PremiumManager.isPremium) {
                     val cx = dialogBinding.etTriggerX.text?.toString()?.toIntOrNull()
                     val cy = dialogBinding.etTriggerY.text?.toString()?.toIntOrNull()
                     if (cx == null || cy == null) {
@@ -793,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                         pointRepeatCount = pointRepeat,
                         pointRepeatMode = pointRepeatMode,
                         pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
-                        stopLoopOnExecute = dialogBinding.cbStopLoopOnExecute.isChecked
+                        stopLoopOnExecute = dialogBinding.cbStopLoopOnExecute.isChecked && PremiumManager.isPremium
                     )
                 )
                 pointAdapter.notifyItemInserted(points.size - 1)
