@@ -181,6 +181,17 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra("show_premium_dialog", false)) {
             showPremiumDialog()
         }
+        val profileId = intent.getStringExtra("load_profile_id")
+        if (profileId != null) {
+            val profile = ProfileManager.loadAll(this).firstOrNull { it.id == profileId }
+            if (profile != null) {
+                AdManager.showInterstitial(this) {
+                    SequencePrefs.save(this, profile.config)
+                    sendBroadcast(Intent(SequencePrefs.ACTION_POINTS_CHANGED).apply { setPackage(packageName) })
+                    Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -432,7 +443,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnProfileManager.setOnClickListener {
-            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
             profileManagerLauncher.launch(Intent(this, ProfileManagerActivity::class.java))
         }
 

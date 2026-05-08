@@ -3,6 +3,7 @@ package com.autoclicker
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import com.autoclicker.databinding.ActivitySettingsBinding
@@ -23,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupThemeSelector()
         setupInfoSection()
+        setupPremiumSection()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -44,6 +46,26 @@ class SettingsActivity : AppCompatActivity() {
                 else               -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             }
             AppPreferences.setTheme(this, mode)
+        }
+    }
+
+    private fun setupPremiumSection() {
+        if (PremiumManager.isPremium) {
+            binding.tvPremiumStatus.text = "✅ 프리미엄"
+            binding.tvPremiumDesc.text = "모든 기능이 잠금 해제되어 있습니다."
+            binding.btnPurchasePremium.text = "구매 완료"
+            binding.btnPurchasePremium.isEnabled = false
+            binding.btnPurchasePremium.backgroundTintList =
+                android.content.res.ColorStateList.valueOf(0xFF4CAF50.toInt())
+        } else {
+            binding.btnPurchasePremium.setOnClickListener {
+                PremiumManager.launchPurchase(this) { success ->
+                    if (success) {
+                        Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+                        setupPremiumSection()
+                    }
+                }
+            }
         }
     }
 

@@ -11,6 +11,51 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- 프리미엄 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardPremium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#1E1B4B">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/tvPremiumStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔒 무료 버전"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvPremiumDesc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="스와이프 · 색상 트리거 · 프로필 · 녹화 · 오차 설정\n포인트 무제한 등 모든 기능 잠금 해제"
+                    android:textSize="13sp"
+                    android:textColor="#C7C9FF"
+                    android:layout_marginBottom="16dp" />
+
+                <Button
+                    android:id="@+id/btnPurchasePremium"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="프리미엄 구매 ₩4,900"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#6366F1" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- 테마 설정 -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"

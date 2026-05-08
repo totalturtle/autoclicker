@@ -29,6 +29,12 @@ class ProfileManagerActivity : AppCompatActivity() {
 
     private var pendingExportProfile: Profile? = null
 
+    private val profileChangedReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+            refreshProfiles()
+        }
+    }
+
     private val exportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -78,14 +84,36 @@ class ProfileManagerActivity : AppCompatActivity() {
         adapter = ProfileAdapter(
             profiles,
             onLoad = { p ->
-                setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_JSON, p.config.toJsonString()))
-                finish()
+                if (PremiumManager.isPremium) {
+                    setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_JSON, p.config.toJsonString()))
+                    finish()
+                } else {
+                    AdManager.showInterstitial(this) {
+                        setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_JSON, p.config.toJsonString()))
+                        finish()
+                    }
+                }
             },
             onExport = { p ->
                 pendingExportProfile = p
                 exportLauncher.launch("${p.name}.json")
             },
-            onSetApp = { p -> showSetAppDialog(p) },
+            onSetApp = { p ->
+                if (!PremiumManager.isPremium) {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("🔒 프리미엄 기능")
+                        .setMessage("앱 자동 연동은 프리미엄 버전에서 사용할 수 있습니다.\n₩4,900 일회 결제로 모든 기능을 영구적으로 이용하세요.")
+                        .setPositiveButton("구매하기") { _, _ ->
+                            PremiumManager.launchPurchase(this) { success ->
+                                if (success) Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .setNegativeButton("취소", null)
+                        .show()
+                } else {
+                    showSetAppDialog(p)
+                }
+            },
             onDelete = { p ->
                 MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.dialog_delete_profile_title)
@@ -126,6 +154,22 @@ class ProfileManagerActivity : AppCompatActivity() {
         refreshProfiles()
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshProfiles()
+        val filter = android.content.IntentFilter("com.autoclicker.ACTION_PROFILE_CHANGED")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(profileChangedReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(profileChangedReceiver, filter)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        runCatching { unregisterReceiver(profileChangedReceiver) }
+    }
+
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
@@ -143,6 +187,21 @@ class ProfileManagerActivity : AppCompatActivity() {
         val config = SequencePrefs.load(this)
         if (config == null || config.points.isEmpty()) {
             Toast.makeText(this, R.string.toast_no_points_to_save, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val profileCount = ProfileManager.loadAll(this).size
+        android.util.Log.d("ProfileDebug", "count=$profileCount isPremium=${PremiumManager.isPremium}")
+        if (!PremiumManager.isPremium && profileCount >= 2) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle("🔒 프리미엄 기능")
+                .setMessage("무료 버전은 프로필을 2개까지 저장할 수 있습니다.\n₩4,900 일회 결제로 무제한 저장하세요.")
+                .setPositiveButton("구매하기") { _, _ ->
+                    PremiumManager.launchPurchase(this) { success ->
+                        if (success) Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("취소", null)
+                .show()
             return
         }
         val dialogBinding = DialogSaveProfileBinding.inflate(LayoutInflater.from(this))
@@ -165,7 +224,8 @@ class ProfileManagerActivity : AppCompatActivity() {
 
     private fun showSetAppDialog(profile: Profile) {
         val dialogBinding = DialogSaveProfileBinding.inflate(LayoutInflater.from(this))
-        dialogBinding.etProfileName.hint = getString(R.string.hint_app_package)
+        (dialogBinding.etProfileName.parent as? com.google.android.material.textfield.TextInputLayout)
+            ?.hint = getString(R.string.hint_app_package)
         dialogBinding.etProfileName.setText(profile.linkedAppPackage)
         dialogBinding.etProfileName.inputType = android.text.InputType.TYPE_CLASS_TEXT
         MaterialAlertDialogBuilder(this)

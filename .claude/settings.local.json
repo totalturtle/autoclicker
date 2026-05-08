@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/PC/Desktop/클로드/새 폴더/**)",
+      "Read(//c/Users/PC/Desktop/클로드/**)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew assembleRelease)",
+      "Bash('C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe' -genkeypair -keystore 'c:/Users/PC/Desktop/클로드/새 폴더/AutoClicker/autoclicker-release.jks' -alias autoclicker -keyalg RSA -keysize 2048 -validity 10000 -storepass autoclicker2024 -keypass autoclicker2024 -dname 'CN=AutoClicker, OU=Dev, O=totalturtle, L=Seoul, ST=Seoul, C=KR')",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew clean assembleDebug)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\")",
+      "Bash(cp \"c:\\\\Users\\\\PC\\\\Desktop\\\\클로드\\\\새 폴더\\\\AutoClicker\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\" \"/Z/0.test/auto/\")",
+      "Read(//z/0.test/auto/**)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew installDebug)",
+      "Bash(adb devices *)",
+      "Bash(adb -s R54N80098WW install -r \"c:\\\\Users\\\\PC\\\\Desktop\\\\클로드\\\\새 폴더\\\\AutoClicker\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\\\\app-debug.apk\")",
+      "Bash(adb -s R54N80098WW install -r '/c/Users/PC/Desktop/클로드/새 폴더/AutoClicker/app/build/outputs/apk/debug/app-debug.apk')"
+    ]
+  }
+}

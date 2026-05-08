@@ -1044,6 +1044,10 @@ class OverlayService : Service() {
             Toast.makeText(this, "저장할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
+            Toast.makeText(this, "🔒 무료 버전은 프로필을 2개까지 저장할 수 있습니다. 설정 > 프리미엄 구매에서 이용하세요.", Toast.LENGTH_LONG).show()
+            return
+        }
         isDialogShowing = true
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
         val input = android.widget.EditText(themedCtx).apply {
@@ -1061,6 +1065,7 @@ class OverlayService : Service() {
                     Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 } else {
                     ProfileManager.save(this, Profile(name = name, config = cfg))
+                    sendBroadcast(Intent("com.autoclicker.ACTION_PROFILE_CHANGED").apply { setPackage(packageName) })
                     Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -1084,10 +1089,19 @@ class OverlayService : Service() {
             .setTitle("프로필 불러오기")
             .setItems(names) { _, which ->
                 val profile = profiles[which]
-                SequencePrefs.save(this, profile.config)
-                sequenceJson = profile.config.toJsonString()
-                refreshMarkers()
-                Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+                if (PremiumManager.isPremium) {
+                    SequencePrefs.save(this, profile.config)
+                    sequenceJson = profile.config.toJsonString()
+                    refreshMarkers()
+                    Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+                } else {
+                    // 광고는 Activity 컨텍스트 필요 → MainActivity 경유
+                    val intent = Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("load_profile_id", profile.id)
+                    }
+                    startActivity(intent)
+                }
             }
             .setNegativeButton("취소", null)
             .create()
