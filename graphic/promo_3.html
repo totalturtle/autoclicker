@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1920px; background: linear-gradient(160deg, #1a2e1a 0%, #1c1c1e 50%, #1a2a2e 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
+
+  .title {
+    color: #ffffff;
+    font-size: 72px;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.25;
+    margin-bottom: 80px;
+    letter-spacing: -1px;
+  }
+  .title span { color: #34d399; }
+
+  .phone-wrap {
+    position: relative;
+    width: 480px;
+    height: 980px;
+  }
+
+  .phone-frame {
+    width: 480px;
+    height: 980px;
+    background: #1a1a1a;
+    border-radius: 60px;
+    border: 10px solid #444;
+    box-shadow: 0 0 0 2px #222, 0 40px 120px rgba(0,0,0,0.7), inset 0 0 0 1px #555;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .phone-notch {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 28px;
+    background: #1a1a1a;
+    border-radius: 20px;
+    z-index: 10;
+  }
+
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    border-radius: 52px;
+    overflow: hidden;
+  }
+
+  .phone-screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+
+  .badge {
+    margin-top: 70px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+  }
+  .badge-item {
+    background: rgba(52,211,153,0.12);
+    border: 1.5px solid rgba(52,211,153,0.35);
+    border-radius: 50px;
+    padding: 16px 36px;
+    color: #6ee7b7;
+    font-size: 32px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="title">앱별 <span>프로필</span>로<br>자동 전환</div>
+
+  <div class="phone-wrap">
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <img src="Screenshot_20260508_100336_AutoClicker.jpg">
+      </div>
+    </div>
+  </div>
+
+  <div class="badge">
+    <div class="badge-item">📁 프로필 저장</div>
+    <div class="badge-item">🔄 자동 연동</div>
+    <div class="badge-item">📤 파일 공유</div>
+  </div>
+</body>
+</html>
