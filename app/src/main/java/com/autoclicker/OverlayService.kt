@@ -22,8 +22,10 @@ import android.view.WindowManager
 import android.widget.AdapterView
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.app.PendingIntent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.view.isVisible
@@ -45,8 +47,11 @@ class OverlayService : Service() {
 
     companion object {
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
-        const val ACTION_TOGGLE_MARKERS = "com.autoclicker.OVERLAY_TOGGLE_MARKERS"
-        const val ACTION_AUTO_SHOW = "com.autoclicker.OVERLAY_AUTO_SHOW"
+        const val ACTION_TOGGLE_MARKERS  = "com.autoclicker.OVERLAY_TOGGLE_MARKERS"
+        const val ACTION_AUTO_SHOW       = "com.autoclicker.OVERLAY_AUTO_SHOW"
+        const val ACTION_PROFILE_PREV    = "com.realbtob.autoclicker.PROFILE_PREV"
+        const val ACTION_PROFILE_NEXT    = "com.realbtob.autoclicker.PROFILE_NEXT"
+        private const val ACTION_PROFILE_CHANGED = "com.autoclicker.ACTION_PROFILE_CHANGED"
         private const val CHANNEL_ID  = "overlay_channel"
         private const val NOTIF_ID    = 1001
     }
@@ -64,6 +69,7 @@ class OverlayService : Service() {
     private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
     private var markersVisible        = true
+    private var activeProfileId: String? = null
 
     // 영역 캡처 대기 중 다이얼로그 상태 임시 저장
     private var pendingRegionX = 0
@@ -104,6 +110,12 @@ class OverlayService : Service() {
                 PointSettingsActivity.ACTION_POINT_UPDATED -> refreshMarkers()
                 SequencePrefs.ACTION_POINTS_CHANGED -> refreshMarkers()
                 ACTION_TOGGLE_MARKERS -> setMarkersVisible(!markersVisible)
+                ACTION_PROFILE_CHANGED -> {
+                    refreshProfileQuickButtons()
+                    updateNotification()
+                }
+                ACTION_PROFILE_PREV -> switchProfile(-1)
+                ACTION_PROFILE_NEXT -> switchProfile(+1)
                 AutoClickAccessibilityService.ACTION_COLOR_SAMPLED -> {
                     val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET) ?: return
                     if (target != CoordPickerService.TARGET_OVERLAY_COLOR) return
@@ -161,11 +173,17 @@ class OverlayService : Service() {
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
             addAction(SequencePrefs.ACTION_POINTS_CHANGED)
             addAction(ACTION_TOGGLE_MARKERS)
+            addAction(ACTION_PROFILE_CHANGED)
+            addAction(ACTION_PROFILE_PREV)
+            addAction(ACTION_PROFILE_NEXT)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
         else
             registerReceiver(receiver, filter)
+
+        refreshProfileQuickButtons()
+        updateNotification()
 
         // 기본 상태: 패널 최소화 + 마커 숨김
         setPanelCollapsed(true)
@@ -1090,9 +1108,11 @@ class OverlayService : Service() {
             .setItems(names) { _, which ->
                 val profile = profiles[which]
                 if (PremiumManager.isPremium) {
+                    activeProfileId = profile.id
                     SequencePrefs.save(this, profile.config)
                     sequenceJson = profile.config.toJsonString()
                     refreshMarkers()
+                    refreshProfileQuickButtons()
                     Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
                 } else {
                     // 광고는 Activity 컨텍스트 필요 → MainActivity 경유
@@ -1131,6 +1151,104 @@ class OverlayService : Service() {
         markers.clear()
         swipeEndMarkers.forEach { runCatching { windowManager.removeView(it.view) } }
         swipeEndMarkers.clear()
+    }
+
+    // ── 프로필 퀵 스위처 ────────────────────────────────────────────────
+
+    private fun refreshProfileQuickButtons() {
+        val container = overlayView.findViewById<LinearLayout>(R.id.layoutProfileQuick) ?: return
+        container.removeAllViews()
+        val profiles = ProfileManager.loadAll(this)
+        if (profiles.isEmpty()) return
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        profiles.take(10).forEachIndexed { idx, profile ->
+            val isActive = profile.id == activeProfileId
+            val isPremiumGated = !PremiumManager.isPremium && idx >= 2
+            val btn = Button(themedCtx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(44), dp(24)).apply {
+                    topMargin = dp(3)
+                }
+                text = "P${idx + 1}"
+                textSize = 8f
+                setTextColor(when {
+                    isActive       -> 0xFF3FB950.toInt()
+                    isPremiumGated -> 0xFF484F58.toInt()
+                    else           -> 0xFF6366F1.toInt()
+                })
+                setBackgroundResource(if (isActive) R.drawable.bg_edit_mode_on else R.drawable.bg_edit_mode_off)
+                setPadding(0, 0, 0, 0)
+                stateListAnimator = null
+                contentDescription = profile.name
+                setOnClickListener {
+                    if (isPremiumGated) {
+                        Toast.makeText(this@OverlayService, "🔒 프리미엄 기능입니다.", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    loadProfileAndStart(profile)
+                }
+            }
+            container.addView(btn)
+        }
+    }
+
+    private fun loadProfileAndStart(profile: Profile) {
+        if (isRunning) {
+            setRunningState(false)
+            AutoClickAccessibilityService.instance?.requestStop()
+                ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+        }
+        if (PremiumManager.isPremium) {
+            activeProfileId = profile.id
+            SequencePrefs.save(this, profile.config)
+            sequenceJson = profile.config.toJsonString()
+            refreshMarkers()
+            refreshProfileQuickButtons()
+            val cfg = SequencePrefs.load(this)
+            if (cfg != null && cfg.points.isNotEmpty()) {
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply { setPackage(packageName) })
+            }
+            Toast.makeText(this, "\"${profile.name}\" 실행 중", Toast.LENGTH_SHORT).show()
+        } else {
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("load_profile_id", profile.id)
+            })
+        }
+    }
+
+    private fun switchProfile(direction: Int) {
+        val profiles = ProfileManager.loadAll(this)
+        if (profiles.isEmpty()) return
+        val currentIdx = profiles.indexOfFirst { it.id == activeProfileId }
+        val nextIdx = if (currentIdx < 0) {
+            if (direction > 0) 0 else profiles.lastIndex
+        } else {
+            (currentIdx + direction + profiles.size) % profiles.size
+        }
+        loadProfileAndStart(profiles[nextIdx])
+    }
+
+    private fun updateNotification() {
+        val profiles = ProfileManager.loadAll(this)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("AutoClicker")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+        if (profiles.size > 1) {
+            val active = profiles.firstOrNull { it.id == activeProfileId }
+            builder.setContentText(if (active != null) "프로필: ${active.name}" else "프로필 ${profiles.size}개 저장됨")
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            val prevPi = PendingIntent.getBroadcast(this, 100,
+                Intent(ACTION_PROFILE_PREV).apply { setPackage(packageName) }, flags)
+            val nextPi = PendingIntent.getBroadcast(this, 101,
+                Intent(ACTION_PROFILE_NEXT).apply { setPackage(packageName) }, flags)
+            builder.addAction(0, "◀ 이전", prevPi)
+            builder.addAction(0, "다음 ▶", nextPi)
+        } else {
+            builder.setContentText("플로팅 패널로 포인트를 설정하세요.")
+        }
+        getSystemService(NotificationManager::class.java).notify(NOTIF_ID, builder.build())
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────────────
