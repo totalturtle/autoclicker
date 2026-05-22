@@ -8,7 +8,7 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.autoclicker"
+        applicationId "com.realbtob.autoclicker"
         minSdk 26
         targetSdk 36
         versionCode 4
