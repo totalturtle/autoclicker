@@ -1,4 +1,4 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
@@ -21,8 +21,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.autoclicker.databinding.ActivityMainBinding
-import com.autoclicker.databinding.DialogAddPointBinding
+import com.realbtob.autoclicker.databinding.ActivityMainBinding
+import com.realbtob.autoclicker.databinding.DialogAddPointBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /** 포인트 추가 다이얼로그의 현재 입력 상태 스냅샷 (좌표 피커 왕복 시 복원용) */

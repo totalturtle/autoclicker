@@ -1,4 +1,4 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.app.Activity
 import android.content.Context

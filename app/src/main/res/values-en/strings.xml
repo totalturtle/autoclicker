@@ -123,5 +123,10 @@
     <string name="hint_accessibility_desc">The accessibility service must be enabled for auto-click to work. Tap the button below to open system settings.</string>
     <string name="section_app_info">App Info</string>
     <string name="label_version">Version: %s</string>
+
+    <!-- Debug (visible only in debug builds) -->
+    <string name="section_debug_premium">Debug: Force Premium</string>
+    <string name="hint_debug_premium">For testing only. Active in debug builds; temporarily unlocks premium features without going through billing.</string>
+    <string name="label_debug_premium_toggle">Force-enable premium features</string>
     <string name="hint_random_delay_note">When both min and max are set (min &lt; max), a random delay in that range replaces the fixed delay.</string>
 </resources>

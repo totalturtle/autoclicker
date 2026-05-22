@@ -1,10 +1,10 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.autoclicker.databinding.ItemProfileBinding
+import com.realbtob.autoclicker.databinding.ItemProfileBinding
 
 class ProfileAdapter(
     private val profiles: MutableList<Profile>,

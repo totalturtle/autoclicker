@@ -1,4 +1,4 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.app.Activity
 import android.content.Context
@@ -13,15 +13,29 @@ object PremiumManager {
 
     private const val PREFS_NAME = "premium_prefs"
     private const val KEY_PREMIUM = "is_premium"
+    private const val KEY_DEBUG_PREMIUM = "debug_premium_override"
 
     private var billingClient: BillingClient? = null
     private var _isPremium = false
+    private var _debugPremiumOverride = false
 
-    val isPremium: Boolean get() = _isPremium
+    val isPremium: Boolean get() =
+        if (BuildConfig.DEBUG) _isPremium || _debugPremiumOverride else _isPremium
+
+    val isDebugPremiumOverride: Boolean get() = _debugPremiumOverride
+
+    fun setDebugPremiumOverride(context: Context, value: Boolean) {
+        if (!BuildConfig.DEBUG) return
+        _debugPremiumOverride = value
+        prefs(context).edit().putBoolean(KEY_DEBUG_PREMIUM, value).apply()
+    }
 
     fun init(context: Context) {
         val prefs = prefs(context)
         _isPremium = prefs.getBoolean(KEY_PREMIUM, false)
+        if (BuildConfig.DEBUG) {
+            _debugPremiumOverride = prefs.getBoolean(KEY_DEBUG_PREMIUM, false)
+        }
 
         billingClient = BillingClient.newBuilder(context.applicationContext)
             .setListener { billingResult, purchases ->

@@ -1,11 +1,11 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.autoclicker.databinding.ActivityStatsBinding
+import com.realbtob.autoclicker.databinding.ActivityStatsBinding
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

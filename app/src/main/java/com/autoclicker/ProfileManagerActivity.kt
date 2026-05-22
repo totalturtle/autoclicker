@@ -1,4 +1,4 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.app.Activity
 import android.content.Intent
@@ -11,8 +11,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.autoclicker.databinding.ActivityProfileManagerBinding
-import com.autoclicker.databinding.DialogSaveProfileBinding
+import com.realbtob.autoclicker.databinding.ActivityProfileManagerBinding
+import com.realbtob.autoclicker.databinding.DialogSaveProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class ProfileManagerActivity : AppCompatActivity() {

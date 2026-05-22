@@ -1,10 +1,10 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.autoclicker.databinding.ItemClickPointBinding
+import com.realbtob.autoclicker.databinding.ItemClickPointBinding
 
 class PointListAdapter(
     private val points: MutableList<ClickPoint>,

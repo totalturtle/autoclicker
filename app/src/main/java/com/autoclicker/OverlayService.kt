@@ -1,4 +1,4 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -27,7 +27,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.view.isVisible
-import com.autoclicker.databinding.DialogAddPointBinding
+import com.realbtob.autoclicker.databinding.DialogAddPointBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**

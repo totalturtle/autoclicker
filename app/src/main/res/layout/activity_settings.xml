@@ -144,6 +144,49 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- 디버그: 프리미엄 강제 토글 (디버그 빌드 전용) -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardDebugPremium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#3F1D1D">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_debug_premium"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_debug_premium"
+                    android:textSize="12sp"
+                    android:textColor="#FFB4B4"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchDebugPremium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_debug_premium_toggle"
+                    android:textColor="#FFFFFF" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- 앱 정보 -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"

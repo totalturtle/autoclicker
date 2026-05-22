@@ -1,12 +1,13 @@
-package com.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import com.autoclicker.databinding.ActivitySettingsBinding
+import com.realbtob.autoclicker.databinding.ActivitySettingsBinding
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -25,6 +26,7 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelector()
         setupInfoSection()
         setupPremiumSection()
+        setupDebugPremiumToggle()
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -66,6 +68,25 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun setupDebugPremiumToggle() {
+        if (!BuildConfig.DEBUG) {
+            binding.cardDebugPremium.visibility = View.GONE
+            return
+        }
+        binding.cardDebugPremium.visibility = View.VISIBLE
+        binding.switchDebugPremium.setOnCheckedChangeListener(null)
+        binding.switchDebugPremium.isChecked = PremiumManager.isDebugPremiumOverride
+        binding.switchDebugPremium.setOnCheckedChangeListener { _, isChecked ->
+            PremiumManager.setDebugPremiumOverride(this, isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) "프리미엄 강제 ON (디버그)" else "프리미엄 강제 OFF (디버그)",
+                Toast.LENGTH_SHORT
+            ).show()
+            recreate()
         }
     }
 
