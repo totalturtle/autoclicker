@@ -1071,19 +1071,38 @@ class OverlayService : Service() {
             return
         }
 
-        // 기존 프로필 목록 + 새로 저장 옵션
-        val items = (profiles.map { it.name } + listOf("+ 새 이름으로 저장")).toTypedArray()
+        // 기존 프로필 목록 + 새로 저장 옵션 (현재 활성 프로필 표시)
+        val items = (profiles.map { profile ->
+            if (profile.id == activeProfileId) "● ${profile.name}  (현재)" else profile.name
+        } + listOf("+ 새 이름으로 저장")).toTypedArray()
+
         val dialog = MaterialAlertDialogBuilder(themedCtx)
             .setTitle("프로필 저장")
+            .setMessage(if (activeProfileId != null) {
+                val name = profiles.firstOrNull { it.id == activeProfileId }?.name
+                if (name != null) "현재 프로필: $name" else null
+            } else null)
             .setItems(items) { _, which ->
                 if (which < profiles.size) {
-                    // 기존 프로필 덮어쓰기
-                    val updated = profiles[which].copy(config = cfg)
-                    ProfileManager.save(this, updated)
-                    sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
-                    Toast.makeText(this, "\"${updated.name}\" 덮어씌웠습니다.", Toast.LENGTH_SHORT).show()
+                    val target = profiles[which]
+                    // 덮어쓰기 확인
+                    overlayView.post {
+                        MaterialAlertDialogBuilder(themedCtx)
+                            .setTitle("덮어쓰기 확인")
+                            .setMessage("「${target.name}」에 저장하시겠습니까?")
+                            .setNegativeButton("취소", null)
+                            .setPositiveButton("저장") { _, _ ->
+                                ProfileManager.save(this, target.copy(config = cfg))
+                                sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
+                                Toast.makeText(this, "\"${target.name}\" 덮어씌웠습니다.", Toast.LENGTH_SHORT).show()
+                            }
+                            .create().also {
+                                it.window?.setType(overlayType())
+                                it.setOnDismissListener { isDialogShowing = false }
+                                it.show()
+                            }
+                    }
                 } else {
-                    // 새 이름으로 저장 — dismiss 후 다음 다이얼로그 열기
                     overlayView.post { showNewProfileNameDialog(themedCtx, cfg) }
                 }
             }
@@ -1110,14 +1129,26 @@ class OverlayService : Service() {
             .setTitle("새 프로필 저장")
             .setView(input)
             .setNegativeButton("취소", null)
-            .setPositiveButton("저장") { _, _ ->
+            .setPositiveButton("다음") { _, _ ->
                 val name = input.text?.toString()?.trim()
                 if (name.isNullOrEmpty()) {
                     Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 } else {
-                    ProfileManager.save(this, Profile(name = name, config = cfg))
-                    sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
-                    Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
+                    // 최종 확인 팝업
+                    MaterialAlertDialogBuilder(themedCtx)
+                        .setTitle("저장 확인")
+                        .setMessage("「$name」으로 저장하시겠습니까?")
+                        .setNegativeButton("취소", null)
+                        .setPositiveButton("저장") { _, _ ->
+                            ProfileManager.save(this, Profile(name = name, config = cfg))
+                            sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
+                            Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
+                        }
+                        .create().also {
+                            it.window?.setType(overlayType())
+                            it.setOnDismissListener { isDialogShowing = false }
+                            it.show()
+                        }
                 }
             }
             .create()
