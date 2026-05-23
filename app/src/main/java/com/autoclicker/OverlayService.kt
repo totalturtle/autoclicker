@@ -1062,19 +1062,52 @@ class OverlayService : Service() {
             Toast.makeText(this, "저장할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
             return
         }
+        val profiles = ProfileManager.loadAll(this)
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+
+        if (profiles.isEmpty()) {
+            showNewProfileNameDialog(themedCtx, cfg)
+            return
+        }
+
+        // 기존 프로필 목록 + 새로 저장 옵션
+        val items = (profiles.map { it.name } + listOf("+ 새 이름으로 저장")).toTypedArray()
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle("프로필 저장")
+            .setItems(items) { _, which ->
+                if (which < profiles.size) {
+                    // 기존 프로필 덮어쓰기
+                    val updated = profiles[which].copy(config = cfg)
+                    ProfileManager.save(this, updated)
+                    sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
+                    Toast.makeText(this, "\"${updated.name}\" 덮어씌웠습니다.", Toast.LENGTH_SHORT).show()
+                } else {
+                    // 새 이름으로 저장 — dismiss 후 다음 다이얼로그 열기
+                    overlayView.post { showNewProfileNameDialog(themedCtx, cfg) }
+                }
+            }
+            .setNegativeButton("취소", null)
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
+    }
+
+    private fun showNewProfileNameDialog(themedCtx: Context, cfg: ClickSequenceConfig) {
         if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
             Toast.makeText(this, "🔒 무료 버전은 프로필을 2개까지 저장할 수 있습니다. 설정 > 프리미엄 구매에서 이용하세요.", Toast.LENGTH_LONG).show()
+            isDialogShowing = false
             return
         }
         isDialogShowing = true
-        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
         val input = android.widget.EditText(themedCtx).apply {
             hint = "프로필 이름"
             setSingleLine()
             setPadding(48, 32, 48, 16)
         }
         val dialog = MaterialAlertDialogBuilder(themedCtx)
-            .setTitle("프로필 저장")
+            .setTitle("새 프로필 저장")
             .setView(input)
             .setNegativeButton("취소", null)
             .setPositiveButton("저장") { _, _ ->
@@ -1083,7 +1116,7 @@ class OverlayService : Service() {
                     Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 } else {
                     ProfileManager.save(this, Profile(name = name, config = cfg))
-                    sendBroadcast(Intent("com.autoclicker.ACTION_PROFILE_CHANGED").apply { setPackage(packageName) })
+                    sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
                     Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
                 }
             }
