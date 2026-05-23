@@ -443,7 +443,7 @@ class OverlayService : Service() {
                 }
             }
         }
-        if (!markersVisible || isRunning) {
+        if ((!markersVisible || isRunning) && !isEditMode) {
             markers.forEach { it.view.visibility = View.INVISIBLE }
             swipeEndMarkers.forEach { it.view.visibility = View.INVISIBLE }
         }
