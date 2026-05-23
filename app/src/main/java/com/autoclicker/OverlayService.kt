@@ -1071,17 +1071,18 @@ class OverlayService : Service() {
             return
         }
 
-        // 기존 프로필 목록 + 새로 저장 옵션 (현재 활성 프로필 표시)
+        // activeProfileId가 없으면 현재 config와 일치하는 프로필 자동 탐지
+        val cfgJson = cfg.toJsonString()
+        val resolvedActiveId = activeProfileId
+            ?: profiles.firstOrNull { it.config.toJsonString() == cfgJson }?.id
+
+        // 현재 프로필은 ● 마커로만 표시 (중복 제거)
         val items = (profiles.map { profile ->
-            if (profile.id == activeProfileId) "● ${profile.name}  (현재)" else profile.name
-        } + listOf("+ 새 이름으로 저장")).toTypedArray()
+            if (profile.id == resolvedActiveId) "● ${profile.name}" else "    ${profile.name}"
+        } + listOf("    + 새 이름으로 저장")).toTypedArray()
 
         val dialog = MaterialAlertDialogBuilder(themedCtx)
             .setTitle("프로필 저장")
-            .setMessage(if (activeProfileId != null) {
-                val name = profiles.firstOrNull { it.id == activeProfileId }?.name
-                if (name != null) "현재 프로필: $name" else null
-            } else null)
             .setItems(items) { _, which ->
                 if (which < profiles.size) {
                     val target = profiles[which]
