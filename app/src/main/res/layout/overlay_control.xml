@@ -66,21 +66,6 @@
             android:layout_marginTop="4dp"
             android:stateListAnimator="@null" />
 
-        <!-- 프로필 퀵 스위처 (코드에서 동적 생성) -->
-        <LinearLayout
-            android:id="@+id/layoutProfileQuick"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingTop="4dp" />
-
-        <View
-            android:layout_width="32dp"
-            android:layout_height="1dp"
-            android:layout_marginTop="4dp"
-            android:background="#21262D" />
-
         <!-- 편집 모드 토글 -->
         <Button
             android:id="@+id/btnOverlayEditMode"
@@ -131,6 +116,17 @@
             android:background="#21262D" />
 
     </LinearLayout>
+
+    <!-- 프로필 퀵 스위처: 간소화+프로필 상태에서 독립 표시 -->
+    <LinearLayout
+        android:id="@+id/layoutProfileQuick"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
 
     <!-- 시작/정지 (항상 표시) -->
     <Button

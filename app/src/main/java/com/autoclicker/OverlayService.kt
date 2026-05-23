@@ -64,7 +64,7 @@ class OverlayService : Service() {
     private var lastToggleMs          = 0L
     private var isEditMode            = false
     private var isDialogShowing       = false
-    private var isPanelCollapsed      = false
+    private var panelState             = 0   // 0=기본, 1=간소화, 2=간소화+프로필
     private var pendingColorPickIndex = -1
     private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
@@ -185,8 +185,8 @@ class OverlayService : Service() {
         refreshProfileQuickButtons()
         updateNotification()
 
-        // 기본 상태: 패널 최소화 + 마커 숨김
-        setPanelCollapsed(true)
+        // 기본 상태: 간소화 + 마커 숨김
+        setPanelState(1)
         setMarkersVisible(false)
     }
 
@@ -395,7 +395,7 @@ class OverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!wasDrag) setPanelCollapsed(!isPanelCollapsed)
+                    if (!wasDrag) setPanelState((panelState + 1) % 3)
                     true
                 }
                 else -> false
@@ -403,14 +403,32 @@ class OverlayService : Service() {
         }
     }
 
-    private fun setPanelCollapsed(collapsed: Boolean) {
-        isPanelCollapsed = collapsed
+    private fun setPanelState(state: Int) {
+        panelState = state
         val topGroup    = overlayView.findViewById<View>(R.id.layoutCollapsibleTop)
         val bottomGroup = overlayView.findViewById<View>(R.id.layoutCollapsibleBottom)
+        val profileQuick = overlayView.findViewById<View>(R.id.layoutProfileQuick)
         val handle      = overlayView.findViewById<TextView>(R.id.overlayDragHandle)
-        topGroup.visibility    = if (collapsed) View.GONE else View.VISIBLE
-        bottomGroup.visibility = if (collapsed) View.GONE else View.VISIBLE
-        handle.text = if (collapsed) "▷" else "· · ·"
+        when (state) {
+            0 -> { // 기본
+                topGroup.visibility    = View.VISIBLE
+                profileQuick.visibility = View.VISIBLE
+                bottomGroup.visibility = View.VISIBLE
+                handle.text = "· · ·"
+            }
+            1 -> { // 간소화
+                topGroup.visibility    = View.GONE
+                profileQuick.visibility = View.GONE
+                bottomGroup.visibility = View.GONE
+                handle.text = "▷"
+            }
+            else -> { // 간소화+프로필
+                topGroup.visibility    = View.GONE
+                profileQuick.visibility = View.VISIBLE
+                bottomGroup.visibility = View.GONE
+                handle.text = "P"
+            }
+        }
     }
 
     // ── 마커 관리 ───────────────────────────────────────────────────────
@@ -1224,11 +1242,15 @@ class OverlayService : Service() {
         val container = overlayView.findViewById<LinearLayout>(R.id.layoutProfileQuick) ?: return
         container.removeAllViews()
         val profiles = ProfileManager.loadAll(this)
-        if (profiles.isEmpty()) return
+        if (profiles.isEmpty()) {
+            if (panelState != 0) container.visibility = View.GONE
+            return
+        }
+        // 현재 panelState에 맞게 visibility 유지 (0=기본, 2=간소화+프로필에서만 보임)
+        container.visibility = if (panelState == 1) View.GONE else View.VISIBLE
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
         profiles.take(10).forEachIndexed { idx, profile ->
             val isActive = profile.id == activeProfileId
-            val isPremiumGated = !PremiumManager.isPremium && idx >= 2
             val btn = Button(themedCtx).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(44), dp(24)).apply {
                     topMargin = dp(3)
@@ -1236,16 +1258,16 @@ class OverlayService : Service() {
                 text = "P${idx + 1}"
                 textSize = 8f
                 setTextColor(when {
-                    isActive       -> 0xFF3FB950.toInt()
-                    isPremiumGated -> 0xFF484F58.toInt()
-                    else           -> 0xFF6366F1.toInt()
+                    isActive               -> 0xFF3FB950.toInt()
+                    !PremiumManager.isPremium -> 0xFF484F58.toInt()
+                    else                   -> 0xFF6366F1.toInt()
                 })
                 setBackgroundResource(if (isActive) R.drawable.bg_edit_mode_on else R.drawable.bg_edit_mode_off)
                 setPadding(0, 0, 0, 0)
                 stateListAnimator = null
                 contentDescription = profile.name
                 setOnClickListener {
-                    if (isPremiumGated) {
+                    if (!PremiumManager.isPremium) {
                         Toast.makeText(this@OverlayService, "🔒 프리미엄 기능입니다.", Toast.LENGTH_SHORT).show()
                         return@setOnClickListener
                     }
