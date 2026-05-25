@@ -475,27 +475,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showPremiumDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("🔒 프리미엄 기능")
-            .setMessage(
-                "이 기능은 프리미엄 버전에서 사용할 수 있습니다.\n\n" +
-                "✅ 스와이프 제스처\n" +
-                "✅ 색상 트리거\n" +
-                "✅ 포인트 무제한 (무료: 3개)\n" +
-                "✅ 프로필 저장/불러오기\n" +
-                "✅ 터치 녹화\n" +
-                "✅ 딜레이/픽셀 오차 설정\n\n" +
-                "₩4,900 일회 결제로 모든 기능을 영구적으로 이용하세요."
-            )
-            .setPositiveButton("구매하기") { _, _ ->
-                PremiumManager.launchPurchase(this) { success ->
-                    if (success) {
-                        Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+        val baseMessage =
+            "이 기능은 프리미엄 버전에서 사용할 수 있습니다.\n\n" +
+            "✅ 스와이프 제스처\n" +
+            "✅ 색상 트리거\n" +
+            "✅ 포인트 무제한 (무료: 3개)\n" +
+            "✅ 프로필 저장/불러오기\n" +
+            "✅ 터치 녹화\n" +
+            "✅ 딜레이/픽셀 오차 설정\n\n"
+
+        fun buildAndShow(priceLabel: String) {
+            val message = baseMessage + "${priceLabel}일회 결제로 모든 기능을 영구적으로 이용하세요."
+            MaterialAlertDialogBuilder(this)
+                .setTitle("🔒 프리미엄 기능")
+                .setMessage(message)
+                .setPositiveButton("구매하기") { _, _ ->
+                    PremiumManager.launchPurchase(this) { success ->
+                        if (success) {
+                            Toast.makeText(this, "프리미엄으로 업그레이드되었습니다!", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
+                .setNegativeButton("취소", null)
+                .show()
+        }
+
+        PremiumManager.fetchPrice { price ->
+            runOnUiThread {
+                val priceLabel = if (price.isNotEmpty()) "$price " else ""
+                buildAndShow(priceLabel)
             }
-            .setNegativeButton("취소", null)
-            .show()
+        }
     }
 
     private fun startRecording() {

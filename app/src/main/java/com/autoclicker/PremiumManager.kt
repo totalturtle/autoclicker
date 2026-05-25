@@ -122,6 +122,22 @@ object PremiumManager {
         }
     }
 
+    fun fetchPrice(onResult: (String) -> Unit) {
+        val client = billingClient ?: run { onResult(""); return }
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(listOf(
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(PRODUCT_ID)
+                    .setProductType(BillingClient.ProductType.INAPP)
+                    .build()
+            )).build()
+        client.queryProductDetailsAsync(params) { _, productDetailsList ->
+            val price = productDetailsList.firstOrNull()
+                ?.oneTimePurchaseOfferDetails?.formattedPrice ?: ""
+            onResult(price)
+        }
+    }
+
     fun handlePurchase(context: Context, purchase: Purchase) {
         if (purchase.products.contains(PRODUCT_ID) && purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
             if (!purchase.isAcknowledged) {
