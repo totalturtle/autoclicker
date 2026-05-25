@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 인앱 결제 -->
+    <uses-permission android:name="com.android.vending.BILLING" />
     <!-- 오버레이(플로팅 버튼) 권한 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 포그라운드 서비스 유지 -->

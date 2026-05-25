@@ -18,6 +18,7 @@ object PremiumManager {
     private var billingClient: BillingClient? = null
     private var _isPremium = false
     private var _debugPremiumOverride = false
+    private var purchaseCallback: ((Boolean) -> Unit)? = null
 
     val isPremium: Boolean get() =
         if (BuildConfig.DEBUG) _isPremium || _debugPremiumOverride else _isPremium
@@ -54,7 +55,10 @@ object PremiumManager {
                     queryPurchases(context)
                 }
             }
-            override fun onBillingServiceDisconnected() {}
+            override fun onBillingServiceDisconnected() {
+                // 서비스 끊기면 자동 재연결
+                billingClient?.startConnection(this)
+            }
         })
     }
 
@@ -76,9 +80,13 @@ object PremiumManager {
                 override fun onBillingSetupFinished(result: BillingResult) {
                     if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                         doLaunchPurchase(activity, onResult)
+                    } else {
+                        activity.runOnUiThread { onResult(false) }
                     }
                 }
-                override fun onBillingServiceDisconnected() {}
+                override fun onBillingServiceDisconnected() {
+                    activity.runOnUiThread { onResult(false) }
+                }
             })
         } else {
             doLaunchPurchase(activity, onResult)
@@ -87,6 +95,7 @@ object PremiumManager {
 
     private fun doLaunchPurchase(activity: Activity, onResult: (Boolean) -> Unit) {
         val client = billingClient ?: return
+        purchaseCallback = onResult  // 구매 완료 시 handlePurchase에서 호출
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(listOf(
                 QueryProductDetailsParams.Product.newBuilder()
@@ -97,6 +106,7 @@ object PremiumManager {
 
         client.queryProductDetailsAsync(params) { result, productDetailsList ->
             if (result.responseCode != BillingClient.BillingResponseCode.OK || productDetailsList.isEmpty()) {
+                purchaseCallback = null
                 activity.runOnUiThread { onResult(false) }
                 return@queryProductDetailsAsync
             }
@@ -108,7 +118,6 @@ object PremiumManager {
                         .build()
                 )).build()
 
-            // BillingClient listener에서 처리됨
             client.launchBillingFlow(activity, billingParams)
         }
     }
@@ -119,9 +128,21 @@ object PremiumManager {
                 val ackParams = AcknowledgePurchaseParams.newBuilder()
                     .setPurchaseToken(purchase.purchaseToken)
                     .build()
-                billingClient?.acknowledgePurchase(ackParams) { }
+                billingClient?.acknowledgePurchase(ackParams) { ackResult ->
+                    if (ackResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                        setPremium(context, true)
+                        val cb = purchaseCallback
+                        purchaseCallback = null
+                        cb?.let { (context as? Activity)?.runOnUiThread { it(true) } }
+                    }
+                }
+            } else {
+                // 이미 승인된 구매 (재설치 등)
+                setPremium(context, true)
+                val cb = purchaseCallback
+                purchaseCallback = null
+                cb?.let { (context as? Activity)?.runOnUiThread { it(true) } }
             }
-            setPremium(context, true)
         }
     }
 
