@@ -279,12 +279,13 @@ Android Accessibility Service를 활용한 자동 터치/클릭 앱
 | 좌표 랜덤 오차(반경 px) | 포인트별 좌표 오차 반경 설정 — 매 탭/롱프레스마다 지정 반경 내 원형 균등 분포 랜덤 좌표로 클릭, `coordinateVariancePx` 필드, JSON key `"cv"` | ✅ 완료 |
 | UI 가독성 개선 | `sans-serif-medium` + MaterialComponents 테마 충돌로 인한 이중글자 현상 수정 — 전체 텍스트뷰 `fontFamily="sans-serif"` + `shadowColor=transparent` 명시, 포인트 목록 제목 15sp·흰색·bold | ✅ 완료 |
 | 드래그 핸들 터치 영역 확대 | 플로팅 패널 드래그 핸들 높이 20dp → 40dp로 확대 | ✅ 완료 |
+| 환불/취소 시 프리미엄 권한 자동 회수 (v4.3.1) | `queryPurchases`에서 미소유 상태면 `setPremium(false)`로 권한 회수 — 환불 시 다음 앱 시작 때 프리미엄 해제. 단, 조회 실패(네트워크 오류 등) 시엔 기존 상태 유지하여 정상 구매자의 오회수 방지 | ✅ 완료 |
 
 ---
 
 ## 빌드 정보
-- **versionCode**: 2
-- **versionName**: 2.0.0
+- **versionCode**: 8
+- **versionName**: 4.3.1
 - **Debug**: `com.autoclicker.debug` (Release와 동시 설치 가능)
 - **Release**: minify + shrinkResources 활성화
 - **저장소**: https://github.com/totalturtle/autoclicker
