@@ -67,9 +67,12 @@ object PremiumManager {
             QueryPurchasesParams.newBuilder()
                 .setProductType(BillingClient.ProductType.INAPP)
                 .build()
-        ) { _, purchases ->
+        ) { result, purchases ->
+            // 조회 실패 시엔 기존 상태 유지 (네트워크 일시 오류로 권한 회수되는 것 방지)
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) return@queryPurchasesAsync
             val owned = purchases.any { it.products.contains(PRODUCT_ID) && it.purchaseState == Purchase.PurchaseState.PURCHASED }
-            if (owned) setPremium(context, true)
+            // 소유하면 부여, 미소유(환불/취소 포함)면 회수
+            setPremium(context, owned)
         }
     }
 
