@@ -1,9 +1,14 @@
-﻿package com.realbtob.autoclicker
+package com.realbtob.autoclicker
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.view.Gravity
@@ -11,6 +16,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 
 class RecordingService : Service() {
 
@@ -19,8 +26,13 @@ class RecordingService : Service() {
         const val ACTION_RECORDING_DONE = "com.autoclicker.ACTION_RECORDING_DONE"
         const val EXTRA_RECORDED_POINTS = "extra_recorded_points"
 
-        // 탭 vs 스와이프 구분 임계값
-        private const val SWIPE_THRESHOLD_PX = 20
+        private const val CHANNEL_ID = "recording_channel"
+        private const val NOTIF_ID = 1002
+
+        // 탭/롱프레스 vs 스와이프 구분 임계값.
+        // 화면 밀도와 무관하게 일관되도록 dp 기준으로 둔다(고밀도 화면에서 미세 드리프트가
+        // 스와이프로 오분류되는 것을 방지). 실제 px 비교는 dp(SWIPE_THRESHOLD_DP)로 환산.
+        private const val SWIPE_THRESHOLD_DP = 16
         private const val LONG_PRESS_THRESHOLD_MS = 500L
     }
 
@@ -38,8 +50,29 @@ class RecordingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        startForegroundWithNotification()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         showOverlay()
+    }
+
+    private fun startForegroundWithNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "터치 녹화 중", NotificationManager.IMPORTANCE_LOW)
+            )
+        }
+        val notif: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("AutoClicker")
+            .setContentText("터치를 녹화하는 중입니다.")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+        ServiceCompat.startForeground(
+            this, NOTIF_ID, notif,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
+        )
     }
 
     override fun onDestroy() {
@@ -117,7 +150,7 @@ class RecordingService : Service() {
                 lastUpTime = upTime
 
                 val point = when {
-                    dist > SWIPE_THRESHOLD_PX -> ClickPoint(
+                    dist > dp(SWIPE_THRESHOLD_DP) -> ClickPoint(
                         x = downX.toInt(),
                         y = downY.toInt(),
                         gesture = GestureType.SWIPE,

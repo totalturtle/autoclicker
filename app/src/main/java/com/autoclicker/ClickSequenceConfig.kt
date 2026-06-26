@@ -1,4 +1,4 @@
-﻿package com.realbtob.autoclicker
+package com.realbtob.autoclicker
 
 import android.content.Context
 import android.content.Intent
@@ -168,7 +168,9 @@ data class ClickSequenceConfig(
                                 randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L),
                                 pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1),
                                 pointRepeatMode = if (o.optString("prm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
-                                pointRepeatDurationMs = o.optLong("prd", 0L).coerceAtLeast(0L),
+                                // DURATION 모드인데 0이면 포인트가 영구 스킵됨 → 최소 1ms로 방어 (손상 import 대비)
+                                pointRepeatDurationMs = if (o.optString("prm") == "d")
+                                    o.optLong("prd", 0L).coerceAtLeast(1L) else o.optLong("prd", 0L).coerceAtLeast(0L),
                                 coordinateVariancePx = o.optInt("cv", 0).coerceAtLeast(0),
                                 tapDurationMs = o.optLong("td", 50L).coerceIn(1L, 60_000L),
                                 stopLoopOnExecute = o.optBoolean("sle", false),
@@ -188,7 +190,9 @@ data class ClickSequenceConfig(
                     globalDelayMs = root.optLong("globalDelay", 1000L).coerceAtLeast(100L),
                     repeatCount = root.optInt("repeat", 0).coerceAtLeast(0),
                     repeatMode = if (root.optString("rm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
-                    repeatDurationMs = root.optLong("rd", 0L).coerceAtLeast(0L)
+                    // DURATION 모드인데 0이면 시퀀스 전체가 즉시 종료됨 → 최소 1ms로 방어
+                    repeatDurationMs = if (root.optString("rm") == "d")
+                        root.optLong("rd", 0L).coerceAtLeast(1L) else root.optLong("rd", 0L).coerceAtLeast(0L)
                 )
             }.getOrNull()
         }

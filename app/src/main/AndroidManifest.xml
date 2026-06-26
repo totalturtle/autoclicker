@@ -93,7 +93,8 @@
         <!-- 터치 녹화 서비스 -->
         <service
             android:name=".RecordingService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- 빠른 설정 타일 -->
         <service

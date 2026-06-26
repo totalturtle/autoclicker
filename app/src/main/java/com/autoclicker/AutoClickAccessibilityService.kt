@@ -223,6 +223,9 @@ class AutoClickAccessibilityService : AccessibilityService() {
             var round = 0
             var totalClicks = 0
             var stopLoopRequested = false
+            // 딜레이는 "다음 동작 직전"에 적용한다(첫 동작 제외).
+            // 이렇게 하면 동작 사이 간격은 그대로 유지하되 마지막 동작 뒤 불필요한 대기를 없앤다.
+            var prevDelayPoint: ClickPoint? = null
 
             fun shouldContinueGlobal(): Boolean {
                 if (stopLoopRequested) return false
@@ -250,6 +253,8 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
                         while (shouldContinuePoint()) {
                             ensureActive()
+                            prevDelayPoint?.let { delay(config.delayAfter(it)) }
+                            ensureActive()
                             val clicked = performPoint(point)
                             if (clicked) {
                                 totalClicks++
@@ -262,9 +267,8 @@ class AutoClickAccessibilityService : AccessibilityService() {
                             } else {
                                 SessionLogger.logSkip(point.label, point.x, point.y)
                             }
+                            prevDelayPoint = point
                             pr++
-                            ensureActive()
-                            delay(config.delayAfter(point))
                         }
                     }
                     round++
