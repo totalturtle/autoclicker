@@ -1,4 +1,4 @@
-﻿package com.realbtob.autoclicker
+package com.realbtob.autoclicker
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,6 +13,7 @@ import android.graphics.*
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.provider.Settings
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -268,10 +269,15 @@ class OverlayService : Service() {
                                 ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
                         } else {
                             val cfg = SequencePrefs.load(this)
-                            if (cfg != null && cfg.points.isNotEmpty()) {
-                                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
-                                    setPackage(packageName)
-                                })
+                            when {
+                                cfg == null || cfg.points.isEmpty() ->
+                                    Toast.makeText(this, "먼저 클릭 포인트를 추가해 주세요.", Toast.LENGTH_SHORT).show()
+                                AutoClickAccessibilityService.instance == null ->
+                                    promptEnableAccessibility()
+                                else ->
+                                    sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
+                                        setPackage(packageName)
+                                    })
                             }
                         }
                     }
@@ -346,6 +352,23 @@ class OverlayService : Service() {
             entry.params.flags = entry.params.flags or flag
         }
         runCatching { windowManager.updateViewLayout(entry.view, entry.params) }
+    }
+
+    /**
+     * 접근성 서비스가 꺼져 있어 자동 클릭을 시작할 수 없을 때 호출.
+     * 무반응 대신 안내 토스트를 띄우고 접근성 설정 화면으로 유도한다.
+     */
+    private fun promptEnableAccessibility() {
+        Toast.makeText(
+            this,
+            "자동 클릭을 시작하려면 접근성 서비스를 켜주세요.",
+            Toast.LENGTH_LONG
+        ).show()
+        runCatching {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+        }
     }
 
     private fun setRunningState(running: Boolean) {
@@ -1291,10 +1314,16 @@ class OverlayService : Service() {
             refreshMarkers()
             refreshProfileQuickButtons()
             val cfg = SequencePrefs.load(this)
-            if (cfg != null && cfg.points.isNotEmpty()) {
-                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply { setPackage(packageName) })
+            when {
+                cfg == null || cfg.points.isEmpty() ->
+                    Toast.makeText(this, "\"${profile.name}\"에 클릭 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
+                AutoClickAccessibilityService.instance == null ->
+                    promptEnableAccessibility()
+                else -> {
+                    sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply { setPackage(packageName) })
+                    Toast.makeText(this, "\"${profile.name}\" 실행 중", Toast.LENGTH_SHORT).show()
+                }
             }
-            Toast.makeText(this, "\"${profile.name}\" 실행 중", Toast.LENGTH_SHORT).show()
         } else {
             startActivity(Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
