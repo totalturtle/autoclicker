@@ -1,4 +1,4 @@
-﻿package com.realbtob.autoclicker
+package com.realbtob.autoclicker
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -64,8 +64,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
     val isClickJobActive: Boolean get() = clickJob?.isActive == true
 
-    private var lastDetectedPackage = ""
-    private var lastPolledPackage = ""
+    @Volatile private var lastAutoPackage = ""
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var clickJob: Job? = null
@@ -130,11 +129,19 @@ class AutoClickAccessibilityService : AccessibilityService() {
             else -> return
         }
         if (pkg == packageName) {
-            lastDetectedPackage = ""
+            lastAutoPackage = ""
             return
         }
-        if (pkg == lastDetectedPackage) return
-        lastDetectedPackage = pkg
+        applyAutoProfile(pkg)
+    }
+
+    /**
+     * 포그라운드 앱(pkg)에 연결된 프로필이 있으면 적용한다.
+     * onAccessibilityEvent와 폴링이 같은 상태(lastAutoPackage)를 공유해 이중 트리거를 막는다.
+     */
+    private fun applyAutoProfile(pkg: String) {
+        if (pkg == packageName || pkg == lastAutoPackage) return
+        lastAutoPackage = pkg
 
         val profile = ProfileManager.findByApp(this, pkg) ?: return
         SequencePrefs.save(this, profile.config)
@@ -168,20 +175,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
             while (isActive) {
                 delay(2000L)
                 val pkg = getForegroundPackage() ?: continue
-                if (pkg == packageName || pkg == lastPolledPackage) continue
-                lastPolledPackage = pkg
-                val profile = ProfileManager.findByApp(this@AutoClickAccessibilityService, pkg) ?: continue
-                SequencePrefs.save(this@AutoClickAccessibilityService, profile.config)
-                ContextCompat.startForegroundService(
-                    this@AutoClickAccessibilityService,
-                    Intent(this@AutoClickAccessibilityService, OverlayService::class.java).apply {
-                        action = OverlayService.ACTION_AUTO_SHOW
-                    }
-                )
-                sendBroadcast(Intent(ACTION_AUTO_PROFILE).apply {
-                    setPackage(packageName)
-                    putExtra(EXTRA_PROFILE_NAME, profile.name)
-                })
+                applyAutoProfile(pkg)
             }
         }
     }
@@ -327,12 +321,12 @@ class AutoClickAccessibilityService : AccessibilityService() {
             GestureType.SWIPE -> {
                 val dur = p.swipeDurationMs.coerceIn(50L, 60_000L)
                 if (p.swipeExtraPoints.isEmpty()) {
-                    dispatchStroke(p.x, p.y, p.endX, p.endY, dur)
+                    dispatchStroke(jx, jy, jitter(p.endX), jitter(p.endY), dur)
                 } else {
                     val waypoints = buildList {
-                        add(p.x to p.y)
-                        add(p.endX to p.endY)
-                        p.swipeExtraPoints.forEach { add(it.x to it.y) }
+                        add(jx to jy)
+                        add(jitter(p.endX) to jitter(p.endY))
+                        p.swipeExtraPoints.forEach { add(jitter(it.x) to jitter(it.y)) }
                     }
                     dispatchPathSwipe(waypoints, dur)
                 }
