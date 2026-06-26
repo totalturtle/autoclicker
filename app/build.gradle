@@ -3,6 +3,14 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// 서명 정보는 버전 관리에서 제외된 keystore.properties에서 읽는다.
+// (파일이 없으면 release 서명은 비활성 — debug 빌드는 영향 없음)
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
 android {
     namespace 'com.realbtob.autoclicker'
     compileSdk 36
@@ -16,17 +24,21 @@ android {
     }
 
     signingConfigs {
-        release {
-            storeFile file("../autoclicker-release.jks")
-            storePassword "autoclicker2024"
-            keyAlias "autoclicker"
-            keyPassword "autoclicker2024"
+        if (keystorePropsFile.exists()) {
+            release {
+                storeFile file(keystoreProps['storeFile'] ?: "../autoclicker-release.jks")
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
