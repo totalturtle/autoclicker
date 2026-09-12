@@ -253,7 +253,10 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
                         while (shouldContinuePoint()) {
                             ensureActive()
-                            prevDelayPoint?.let { delay(config.delayAfter(it)) }
+                            // pr > 0 이면 직전 동작이 "같은 포인트의 반복"이므로 반복 간 딜레이를 쓴다.
+                            prevDelayPoint?.let { prev ->
+                                delay(if (pr > 0) config.repeatDelayAfter(prev) else config.delayAfter(prev))
+                            }
                             ensureActive()
                             val clicked = performPoint(point)
                             if (clicked) {

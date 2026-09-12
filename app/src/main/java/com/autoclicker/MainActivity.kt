@@ -40,6 +40,7 @@ data class PointDialogState(
     val variance: String = "",
     val coordVariance: String = "",
     val pointRepeat: String = "1",
+    val repeatDelay: String = "",
     val pointRepeatModePos: Int = 0,
     val pointRepeatDuration: String = "1",
     val pointRepeatDurationUnit: Int = 0,
@@ -641,6 +642,7 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.etDialogVariance.setText(prefill.variance)
             dialogBinding.etDialogCoordVariance.setText(prefill.coordVariance)
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
+            dialogBinding.etDialogRepeatDelay.setText(prefill.repeatDelay)
             if (prefill.pointRepeatModePos == 1) {
                 dialogBinding.rbPointRepeatTime.isChecked = true
                 dialogBinding.rbPointRepeatCount.isChecked = false
@@ -755,6 +757,7 @@ class MainActivity : AppCompatActivity() {
                 val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 val coordVariance = dialogBinding.etDialogCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
                 val pointRepeat = dialogBinding.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                val repeatDelay = dialogBinding.etDialogRepeatDelay.text?.toString()?.toLongOrNull() ?: -1L
                 val pointRepeatMode = if (dialogBinding.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
                 val pointRepeatDurationValue = dialogBinding.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
                 val pointRepeatUnitPos = when {
@@ -770,6 +773,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (delayAfter >= 0 && delayAfter < 100) {
                     Toast.makeText(this, "포인트 딜레이는 비우거나 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (repeatDelay >= 0 && repeatDelay < 100) {
+                    Toast.makeText(this, "반복 간 딜레이는 비우거나 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
@@ -863,6 +870,7 @@ class MainActivity : AppCompatActivity() {
                         randomVarianceMs = variance,
                         coordinateVariancePx = coordVariance,
                         pointRepeatCount = pointRepeat,
+                        repeatDelayMs = repeatDelay,
                         pointRepeatMode = pointRepeatMode,
                         pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
                         stopLoopOnExecute = dialogBinding.cbStopLoopOnExecute.isChecked && PremiumManager.isPremium
@@ -890,6 +898,7 @@ class MainActivity : AppCompatActivity() {
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
         coordVariance  = d.etDialogCoordVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
+        repeatDelay    = d.etDialogRepeatDelay.text?.toString().orEmpty(),
         pointRepeatModePos    = if (d.rbPointRepeatTime.isChecked) 1 else 0,
         pointRepeatDuration   = d.etDialogPointRepeatDuration.text?.toString().orEmpty(),
         pointRepeatDurationUnit = when {

@@ -707,6 +707,7 @@ class OverlayService : Service() {
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         if (point.coordinateVariancePx > 0) d.etDialogCoordVariance.setText(point.coordinateVariancePx.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
+        if (point.repeatDelayMs >= 0) d.etDialogRepeatDelay.setText(point.repeatDelayMs.toString())
 
         // 반복 모드 UI 복원 (RadioGroup 버그 회피 — 개별 isChecked 직접 제어)
         if (point.pointRepeatMode == RepeatMode.DURATION) {
@@ -997,6 +998,7 @@ class OverlayService : Service() {
         val variance = d.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
         val coordVariance = d.etDialogCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val repeatDelay = d.etDialogRepeatDelay.text?.toString()?.toLongOrNull() ?: -1L
 
         // 반복 모드/시간 읽기 — 개별 isChecked 직접 확인
         val pointRepeatMode = if (d.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
@@ -1078,6 +1080,7 @@ class OverlayService : Service() {
             tapDurationMs = tapMs, longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, randomVarianceMs = variance, coordinateVariancePx = coordVariance,
             pointRepeatCount = pointRepeat,
+            repeatDelayMs = repeatDelay,
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = pointRepeatDurationMs,
             swipeExtraPoints = freshExtras,

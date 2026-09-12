@@ -25,6 +25,8 @@ data class ClickPoint(
     val swipeExtraPoints: List<SwipeWaypoint> = emptyList(),
     val pointRepeatMode: RepeatMode = RepeatMode.COUNT,
     val pointRepeatDurationMs: Long = 0L,
+    /** 같은 포인트를 반복할 때의 간격. 음수이면 delayAfterMs(=기존 동작)를 그대로 사용 */
+    val repeatDelayMs: Long = -1L,
     val coordinateVariancePx: Int = 0,
     val tapDurationMs: Long = 50L,
     val stopLoopOnExecute: Boolean = false
@@ -43,8 +45,17 @@ data class ClickSequenceConfig(
     val repeatMode: RepeatMode = RepeatMode.COUNT,
     val repeatDurationMs: Long = 0L
 ) {
-    fun delayAfter(point: ClickPoint): Long {
-        val base = if (point.delayAfterMs >= 0) point.delayAfterMs else globalDelayMs
+    fun delayAfter(point: ClickPoint): Long =
+        applyVariance(if (point.delayAfterMs >= 0) point.delayAfterMs else globalDelayMs, point)
+
+    /**
+     * 같은 포인트를 연속 반복할 때 적용할 간격.
+     * repeatDelayMs가 설정되지 않았으면(-1) delayAfter와 동일하게 동작한다.
+     */
+    fun repeatDelayAfter(point: ClickPoint): Long =
+        if (point.repeatDelayMs >= 0) applyVariance(point.repeatDelayMs, point) else delayAfter(point)
+
+    private fun applyVariance(base: Long, point: ClickPoint): Long {
         val variance = point.randomVarianceMs
         if (variance <= 0) return base
         val offset = ((Math.random() * variance * 2) - variance).toLong()
@@ -96,6 +107,7 @@ data class ClickSequenceConfig(
                     if (p.coordinateVariancePx > 0) put("cv", p.coordinateVariancePx)
                     if (p.stopLoopOnExecute) put("sle", true)
                     if (p.pointRepeatCount > 1) put("pr", p.pointRepeatCount)
+                    if (p.repeatDelayMs >= 0) put("rpd", p.repeatDelayMs)
                     if (p.pointRepeatMode == RepeatMode.DURATION) {
                         put("prm", "d")
                         put("prd", p.pointRepeatDurationMs)
@@ -167,6 +179,7 @@ data class ClickSequenceConfig(
                                 trigger = trigger,
                                 randomVarianceMs = o.optLong("rv", 0L).coerceAtLeast(0L),
                                 pointRepeatCount = o.optInt("pr", 1).coerceAtLeast(1),
+                                repeatDelayMs = if (o.has("rpd")) o.getLong("rpd").coerceAtLeast(0L) else -1L,
                                 pointRepeatMode = if (o.optString("prm") == "d") RepeatMode.DURATION else RepeatMode.COUNT,
                                 // DURATION 모드인데 0이면 포인트가 영구 스킵됨 → 최소 1ms로 방어 (손상 import 대비)
                                 pointRepeatDurationMs = if (o.optString("prm") == "d")

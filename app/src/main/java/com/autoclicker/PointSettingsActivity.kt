@@ -104,6 +104,7 @@ class PointSettingsActivity : AppCompatActivity() {
         if (point.delayAfterMs >= 0) d.etDialogDelayAfter.setText(point.delayAfterMs.toString())
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
+        if (point.repeatDelayMs >= 0) d.etDialogRepeatDelay.setText(point.repeatDelayMs.toString())
 
         // 개별 RadioButton.isChecked 직접 제어 (RadioGroup 신뢰 불가)
         if (point.pointRepeatMode == RepeatMode.DURATION) {
@@ -319,6 +320,7 @@ if (checked && !PremiumManager.isPremium) {
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
         val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val repeatDelay = d.etDialogRepeatDelay.text?.toString()?.toLongOrNull() ?: -1L
         // 개별 RadioButton.isChecked 직접 읽기 (RadioGroup 신뢰 불가)
         val pointRepeatMode = if (d.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
         val pointRepeatDurationValue = d.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
@@ -392,6 +394,7 @@ if (checked && !PremiumManager.isPremium) {
             gesture = gesture, endX = endX, endY = endY,
             tapDurationMs = tapMs, longPressDurationMs = longMs, swipeDurationMs = swipeMs,
             trigger = newTrigger, pointRepeatCount = pointRepeat,
+            repeatDelayMs = repeatDelay,
             pointRepeatMode = pointRepeatMode,
             pointRepeatDurationMs = if (pointRepeatMode == RepeatMode.DURATION) pointRepeatDurationMs else 0L,
             swipeExtraPoints = if (gesture == GestureType.SWIPE) original.swipeExtraPoints else emptyList(),
