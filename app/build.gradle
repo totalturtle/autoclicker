@@ -19,8 +19,8 @@ android {
         applicationId "com.realbtob.autoclicker"
         minSdk 26
         targetSdk 36
-        versionCode 9
-        versionName "4.3.2"
+        versionCode 10
+        versionName "4.3.3"
     }
 
     signingConfigs {
