@@ -43,6 +43,11 @@ object AdManager {
     }
 
     fun showInterstitial(activity: Activity, onDismiss: () -> Unit) {
+        // 프리미엄 사용자에게는 광고를 노출하지 않는다.
+        if (PremiumManager.isPremium) {
+            onDismiss()
+            return
+        }
         val ad = interstitialAd
         if (ad == null) {
             onDismiss()
