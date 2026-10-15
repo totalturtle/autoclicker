@@ -37,10 +37,12 @@ data class PointDialogState(
     val longDur: String = "450",
     val label: String = "",
     val delayAfter: String = "",
+    val delayAfterUnit: Int = DelayUnit.MS,
     val variance: String = "",
     val coordVariance: String = "",
     val pointRepeat: String = "1",
     val repeatDelay: String = "",
+    val repeatDelayUnit: Int = DelayUnit.MS,
     val pointRepeatModePos: Int = 0,
     val pointRepeatDuration: String = "1",
     val pointRepeatDurationUnit: Int = 0,
@@ -102,7 +104,7 @@ class MainActivity : AppCompatActivity() {
             val config = ClickSequenceConfig.fromJsonString(json) ?: return@registerForActivityResult
             points.clear()
             points.addAll(config.points)
-            binding.etDelay.setText(config.globalDelayMs.toString())
+            DelayUnit.fill(binding.etDelay, binding.spDelayUnit, config.globalDelayMs)
             applyRepeatModeToUI(config)
             pointAdapter.notifyDataSetChanged()
             persistSequence()
@@ -135,7 +137,7 @@ class MainActivity : AppCompatActivity() {
                     val cfg = SequencePrefs.load(this@MainActivity) ?: return
                     points.clear()
                     points.addAll(cfg.points)
-                    binding.etDelay.setText(cfg.globalDelayMs.toString())
+                    DelayUnit.fill(binding.etDelay, binding.spDelayUnit, cfg.globalDelayMs)
                     applyRepeatModeToUI(cfg)
                     pointAdapter.notifyDataSetChanged()
                     Toast.makeText(this@MainActivity, getString(R.string.toast_auto_profile_loaded, name), Toast.LENGTH_SHORT).show()
@@ -373,7 +375,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnApplyDelayToAll.setOnClickListener {
-            val delay = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
+            val delay = DelayUnit.readMs(binding.etDelay, binding.spDelayUnit, 1000L)
             if (delay < 100) {
                 Toast.makeText(this, "딜레이는 최소 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -386,7 +388,7 @@ class MainActivity : AppCompatActivity() {
             points.replaceAll { it.copy(delayAfterMs = delay) }
             pointAdapter.notifyDataSetChanged()
             persistSequence()
-            Toast.makeText(this, "딜레이 ${delay}ms 를 모든 포인트에 적용했습니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "딜레이 ${DelayUnit.format(delay)} 를 모든 포인트에 적용했습니다.", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnApplyVarianceToAll.setOnClickListener {
@@ -638,11 +640,11 @@ class MainActivity : AppCompatActivity() {
             if (prefill.swipeDur.isNotEmpty()) dialogBinding.etDialogSwipeDur.setText(prefill.swipeDur)
             if (prefill.longDur.isNotEmpty()) dialogBinding.etDialogLongDur.setText(prefill.longDur)
             dialogBinding.etDialogLabel.setText(prefill.label)
-            dialogBinding.etDialogDelayAfter.setText(prefill.delayAfter)
+            DelayUnit.restore(dialogBinding.etDialogDelayAfter, dialogBinding.spDialogDelayUnit, prefill.delayAfter, prefill.delayAfterUnit)
             dialogBinding.etDialogVariance.setText(prefill.variance)
             dialogBinding.etDialogCoordVariance.setText(prefill.coordVariance)
             dialogBinding.etDialogPointRepeat.setText(prefill.pointRepeat)
-            dialogBinding.etDialogRepeatDelay.setText(prefill.repeatDelay)
+            DelayUnit.restore(dialogBinding.etDialogRepeatDelay, dialogBinding.spDialogRepeatDelayUnit, prefill.repeatDelay, prefill.repeatDelayUnit)
             if (prefill.pointRepeatModePos == 1) {
                 dialogBinding.rbPointRepeatTime.isChecked = true
                 dialogBinding.rbPointRepeatCount.isChecked = false
@@ -753,11 +755,11 @@ class MainActivity : AppCompatActivity() {
                 val x = dialogBinding.etDialogX.text?.toString()?.toIntOrNull()
                 val y = dialogBinding.etDialogY.text?.toString()?.toIntOrNull()
                 val label = dialogBinding.etDialogLabel.text?.toString()?.trim().orEmpty()
-                val delayAfter = dialogBinding.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
+                val delayAfter = DelayUnit.readMs(dialogBinding.etDialogDelayAfter, dialogBinding.spDialogDelayUnit, -1L)
                 val variance = dialogBinding.etDialogVariance.text?.toString()?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 val coordVariance = dialogBinding.etDialogCoordVariance.text?.toString()?.toIntOrNull()?.coerceAtLeast(0) ?: 0
                 val pointRepeat = dialogBinding.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                val repeatDelay = dialogBinding.etDialogRepeatDelay.text?.toString()?.toLongOrNull() ?: -1L
+                val repeatDelay = DelayUnit.readMs(dialogBinding.etDialogRepeatDelay, dialogBinding.spDialogRepeatDelayUnit, -1L)
                 val pointRepeatMode = if (dialogBinding.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
                 val pointRepeatDurationValue = dialogBinding.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
                 val pointRepeatUnitPos = when {
@@ -895,10 +897,12 @@ class MainActivity : AppCompatActivity() {
         longDur        = d.etDialogLongDur.text?.toString().orEmpty(),
         label          = d.etDialogLabel.text?.toString().orEmpty(),
         delayAfter     = d.etDialogDelayAfter.text?.toString().orEmpty(),
+        delayAfterUnit = d.spDialogDelayUnit.selectedItemPosition,
         variance       = d.etDialogVariance.text?.toString().orEmpty(),
         coordVariance  = d.etDialogCoordVariance.text?.toString().orEmpty(),
         pointRepeat    = d.etDialogPointRepeat.text?.toString().orEmpty(),
         repeatDelay    = d.etDialogRepeatDelay.text?.toString().orEmpty(),
+        repeatDelayUnit = d.spDialogRepeatDelayUnit.selectedItemPosition,
         pointRepeatModePos    = if (d.rbPointRepeatTime.isChecked) 1 else 0,
         pointRepeatDuration   = d.etDialogPointRepeatDuration.text?.toString().orEmpty(),
         pointRepeatDurationUnit = when {
@@ -929,10 +933,10 @@ class MainActivity : AppCompatActivity() {
         points.clear()
         if (cfg != null) {
             points.addAll(cfg.points)
-            binding.etDelay.setText(cfg.globalDelayMs.toString())
+            DelayUnit.fill(binding.etDelay, binding.spDelayUnit, cfg.globalDelayMs)
             applyRepeatModeToUI(cfg)
         } else {
-            binding.etDelay.setText("1000")
+            DelayUnit.fill(binding.etDelay, binding.spDelayUnit, 1000L)
             binding.rbRepeatCount.isChecked = true
             binding.rbRepeatTime.isChecked = false
             binding.etRepeat.setText("0")
@@ -989,7 +993,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun readRawConfig(): ClickSequenceConfig {
-        val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
+        val global = DelayUnit.readMs(binding.etDelay, binding.spDelayUnit, 1000L)
         val repeatMode = if (binding.rbRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
         val repeatCount = binding.etRepeat.text?.toString()?.toIntOrNull() ?: 0
         val repeatDurationValue = binding.etRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L
@@ -1013,7 +1017,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.toast_need_one_point, Toast.LENGTH_SHORT).show()
             return null
         }
-        val global = binding.etDelay.text?.toString()?.toLongOrNull() ?: 1000L
+        val global = DelayUnit.readMs(binding.etDelay, binding.spDelayUnit, 1000L)
 
         if (global < 100) {
             Toast.makeText(this, "딜레이는 최소 100ms 이상이어야 합니다.", Toast.LENGTH_SHORT).show()

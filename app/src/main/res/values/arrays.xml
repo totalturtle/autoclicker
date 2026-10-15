@@ -17,4 +17,9 @@
         <item>횟수 반복</item>
         <item>시간 반복</item>
     </string-array>
+    <string-array name="delay_unit_labels">
+        <item>ms</item>
+        <item>초</item>
+        <item>분</item>
+    </string-array>
 </resources>

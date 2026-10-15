@@ -101,10 +101,10 @@ class PointSettingsActivity : AppCompatActivity() {
         d.etDialogX.setText(point.x.toString())
         d.etDialogY.setText(point.y.toString())
         d.etDialogLabel.setText(point.label)
-        if (point.delayAfterMs >= 0) d.etDialogDelayAfter.setText(point.delayAfterMs.toString())
+        DelayUnit.fill(d.etDialogDelayAfter, d.spDialogDelayUnit, point.delayAfterMs)
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
-        if (point.repeatDelayMs >= 0) d.etDialogRepeatDelay.setText(point.repeatDelayMs.toString())
+        DelayUnit.fill(d.etDialogRepeatDelay, d.spDialogRepeatDelayUnit, point.repeatDelayMs)
 
         // 개별 RadioButton.isChecked 직접 제어 (RadioGroup 신뢰 불가)
         if (point.pointRepeatMode == RepeatMode.DURATION) {
@@ -318,9 +318,9 @@ if (checked && !PremiumManager.isPremium) {
         val x = d.etDialogX.text?.toString()?.toIntOrNull() ?: original.x
         val y = d.etDialogY.text?.toString()?.toIntOrNull() ?: original.y
         val label = d.etDialogLabel.text?.toString()?.trim().orEmpty()
-        val delayAfter = d.etDialogDelayAfter.text?.toString()?.toLongOrNull() ?: -1L
+        val delayAfter = DelayUnit.readMs(d.etDialogDelayAfter, d.spDialogDelayUnit, -1L)
         val pointRepeat = d.etDialogPointRepeat.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-        val repeatDelay = d.etDialogRepeatDelay.text?.toString()?.toLongOrNull() ?: -1L
+        val repeatDelay = DelayUnit.readMs(d.etDialogRepeatDelay, d.spDialogRepeatDelayUnit, -1L)
         // 개별 RadioButton.isChecked 직접 읽기 (RadioGroup 신뢰 불가)
         val pointRepeatMode = if (d.rbPointRepeatTime.isChecked) RepeatMode.DURATION else RepeatMode.COUNT
         val pointRepeatDurationValue = d.etDialogPointRepeatDuration.text?.toString()?.toLongOrNull()?.coerceAtLeast(1L) ?: 1L

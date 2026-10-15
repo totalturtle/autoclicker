@@ -20,7 +20,7 @@ class PointListAdapter(
                 "#${position + 1}"
             }
             binding.tvPointTitle.text = title
-            val baseDelay = if (point.delayAfterMs >= 0) "${point.delayAfterMs}ms"
+            val baseDelay = if (point.delayAfterMs >= 0) DelayUnit.format(point.delayAfterMs)
                            else binding.root.context.getString(R.string.delay_uses_global)
             val delayText = if (point.randomVarianceMs > 0) "$baseDelay ±${point.randomVarianceMs}ms"
                             else baseDelay

@@ -302,9 +302,10 @@
                     android:layout_marginBottom="6dp">
 
                     <com.google.android.material.textfield.TextInputLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:hint="딜레이 (ms)"
+                        android:layout_weight="1"
+                        android:hint="딜레이"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etDelay"
@@ -314,6 +315,15 @@
                             android:text="1000"
                             android:textColor="@color/text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
+
+                    <Spinner
+                        android:id="@+id/spDelayUnit"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minWidth="76dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_gravity="center_vertical"
+                        android:entries="@array/delay_unit_labels" />
                 </LinearLayout>
 
                 <!-- 반복 설정 -->
