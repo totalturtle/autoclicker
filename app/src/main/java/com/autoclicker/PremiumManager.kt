@@ -107,7 +107,8 @@ object PremiumManager {
                     .build()
             )).build()
 
-        client.queryProductDetailsAsync(params) { result, productDetailsList ->
+        client.queryProductDetailsAsync(params) { result, queryResult ->
+            val productDetailsList = queryResult.productDetailsList
             if (result.responseCode != BillingClient.BillingResponseCode.OK || productDetailsList.isEmpty()) {
                 purchaseCallback = null
                 activity.runOnUiThread { onResult(false) }
@@ -134,8 +135,8 @@ object PremiumManager {
                     .setProductType(BillingClient.ProductType.INAPP)
                     .build()
             )).build()
-        client.queryProductDetailsAsync(params) { _, productDetailsList ->
-            val price = productDetailsList.firstOrNull()
+        client.queryProductDetailsAsync(params) { _, queryResult ->
+            val price = queryResult.productDetailsList.firstOrNull()
                 ?.oneTimePurchaseOfferDetails?.formattedPrice ?: ""
             onResult(price)
         }
