@@ -70,6 +70,10 @@
     <string name="toast_no_points_to_save">저장할 포인트가 없습니다.</string>
     <string name="toast_enter_name">이름을 입력하세요.</string>
     <string name="toast_profile_saved">\'%s\' 저장됨</string>
+    <string name="dialog_overwrite_profile_title">덮어쓰기 확인</string>
+    <string name="dialog_overwrite_profile_msg">\'%s\'에 현재 설정을 덮어쓰시겠습니까?</string>
+    <string name="toast_profile_overwritten">\'%s\' 덮어썼습니다</string>
+    <string name="toast_profile_missing">프로필을 찾을 수 없습니다.</string>
     <string name="toast_profile_loaded">\'%s\' 프로필이 로드되었습니다.</string>
     <string name="toast_app_linked">\'%s\' 앱에 연동됨</string>
     <string name="toast_app_link_removed">앱 연동이 해제됨</string>

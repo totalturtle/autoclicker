@@ -18,8 +18,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 class ProfileManagerActivity : AppCompatActivity() {
 
     companion object {
-        const val EXTRA_CURRENT_CONFIG_JSON = "current_config_json"
-        const val RESULT_PROFILE_JSON = "profile_json"
+        const val RESULT_PROFILE_ID = "profile_id"
     }
 
     private lateinit var binding: ActivityProfileManagerBinding
@@ -64,6 +63,7 @@ class ProfileManagerActivity : AppCompatActivity() {
                 return@registerForActivityResult
             }
             ProfileManager.save(this, profile)
+            ProfileManager.notifyChanged(this)
             refreshProfiles()
             Toast.makeText(this, getString(R.string.toast_import_done, profile.name), Toast.LENGTH_SHORT).show()
         }.onFailure {
@@ -85,13 +85,9 @@ class ProfileManagerActivity : AppCompatActivity() {
             profiles,
             onLoad = { p ->
                 if (PremiumManager.isPremium) {
-                    setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_JSON, p.config.toJsonString()))
-                    finish()
+                    finishWithProfile(p)
                 } else {
-                    AdManager.showInterstitial(this) {
-                        setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_JSON, p.config.toJsonString()))
-                        finish()
-                    }
+                    AdManager.showInterstitial(this) { finishWithProfile(p) }
                 }
             },
             onExport = { p ->
@@ -120,6 +116,7 @@ class ProfileManagerActivity : AppCompatActivity() {
                     .setMessage(getString(R.string.dialog_delete_profile_msg, p.name))
                     .setPositiveButton(R.string.btn_delete) { _, _ ->
                         ProfileManager.delete(this, p.id)
+                        ProfileManager.notifyChanged(this)
                         refreshProfiles()
                     }
                     .setNegativeButton(android.R.string.cancel, null)
@@ -139,6 +136,7 @@ class ProfileManagerActivity : AppCompatActivity() {
             override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
                 super.clearView(rv, vh)
                 ProfileManager.saveOrder(this@ProfileManagerActivity, profiles)
+                ProfileManager.notifyChanged(this@ProfileManagerActivity)
             }
         })
 
@@ -157,7 +155,7 @@ class ProfileManagerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshProfiles()
-        val filter = android.content.IntentFilter("com.autoclicker.ACTION_PROFILE_CHANGED")
+        val filter = android.content.IntentFilter(ProfileManager.ACTION_PROFILE_CHANGED)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(profileChangedReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
@@ -189,9 +187,46 @@ class ProfileManagerActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.toast_no_points_to_save, Toast.LENGTH_SHORT).show()
             return
         }
-        val profileCount = ProfileManager.loadAll(this).size
-        android.util.Log.d("ProfileDebug", "count=$profileCount isPremium=${PremiumManager.isPremium}")
-        if (!PremiumManager.isPremium && profileCount >= 2) {
+        val all = ProfileManager.loadAll(this)
+        val current = all.firstOrNull { it.id == ProfileManager.getActiveId(this) }
+        val dialogBinding = DialogSaveProfileBinding.inflate(LayoutInflater.from(this))
+        // 불러온 프로필이 있으면 이름을 채워 둬서 덮어쓰기/다른 이름 저장을 바로 고를 수 있게 한다.
+        current?.let { dialogBinding.etProfileName.setText(it.name) }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_save_profile_title)
+            .setView(dialogBinding.root)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_save) { _, _ ->
+                val name = dialogBinding.etProfileName.text?.toString()?.trim()
+                if (name.isNullOrEmpty()) {
+                    Toast.makeText(this, R.string.toast_enter_name, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val existing = all.firstOrNull { it.name == name }
+                if (existing != null) confirmOverwrite(existing, config) else saveAsNewProfile(name, config)
+            }
+            .show()
+    }
+
+    /** 같은 이름이 이미 있으면 중복 생성 대신 덮어쓸지 확인한다. */
+    private fun confirmOverwrite(target: Profile, config: ClickSequenceConfig) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_overwrite_profile_title)
+            .setMessage(getString(R.string.dialog_overwrite_profile_msg, target.name))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_save) { _, _ ->
+                ProfileManager.save(this, target.copy(config = config))
+                ProfileManager.setActiveId(this, target.id)
+                ProfileManager.notifyChanged(this)
+                refreshProfiles()
+                Toast.makeText(this, getString(R.string.toast_profile_overwritten, target.name), Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    /** 새 프로필 저장. 개수 제한은 새로 만들 때만 적용한다(덮어쓰기는 항상 허용). */
+    private fun saveAsNewProfile(name: String, config: ClickSequenceConfig) {
+        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
             MaterialAlertDialogBuilder(this)
                 .setTitle("🔒 프리미엄 기능")
                 .setMessage("무료 버전은 프로필을 2개까지 저장할 수 있습니다.\n₩4,900 일회 결제로 무제한 저장하세요.")
@@ -204,22 +239,19 @@ class ProfileManagerActivity : AppCompatActivity() {
                 .show()
             return
         }
-        val dialogBinding = DialogSaveProfileBinding.inflate(LayoutInflater.from(this))
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.dialog_save_profile_title)
-            .setView(dialogBinding.root)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.btn_save) { _, _ ->
-                val name = dialogBinding.etProfileName.text?.toString()?.trim()
-                if (name.isNullOrEmpty()) {
-                    Toast.makeText(this, R.string.toast_enter_name, Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                ProfileManager.save(this, Profile(name = name, config = config))
-                refreshProfiles()
-                Toast.makeText(this, getString(R.string.toast_profile_saved, name), Toast.LENGTH_SHORT).show()
-            }
-            .show()
+        val created = Profile(name = name, config = config)
+        ProfileManager.save(this, created)
+        ProfileManager.setActiveId(this, created.id)
+        ProfileManager.notifyChanged(this)
+        refreshProfiles()
+        Toast.makeText(this, getString(R.string.toast_profile_saved, name), Toast.LENGTH_SHORT).show()
+    }
+
+    /** 불러오기: 현재 프로필로 기록하고 id만 돌려준다. */
+    private fun finishWithProfile(profile: Profile) {
+        ProfileManager.setActiveId(this, profile.id)
+        setResult(Activity.RESULT_OK, Intent().putExtra(RESULT_PROFILE_ID, profile.id))
+        finish()
     }
 
     private fun showSetAppDialog(profile: Profile) {
@@ -236,6 +268,7 @@ class ProfileManagerActivity : AppCompatActivity() {
             .setPositiveButton(R.string.btn_set) { _, _ ->
                 val pkg = dialogBinding.etProfileName.text?.toString()?.trim() ?: ""
                 ProfileManager.save(this, profile.copy(linkedAppPackage = pkg))
+                ProfileManager.notifyChanged(this)
                 refreshProfiles()
                 Toast.makeText(
                     this,

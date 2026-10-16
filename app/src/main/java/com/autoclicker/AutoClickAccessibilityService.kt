@@ -144,6 +144,8 @@ class AutoClickAccessibilityService : AccessibilityService() {
         lastAutoPackage = pkg
 
         val profile = ProfileManager.findByApp(this, pkg) ?: return
+        ProfileManager.setActiveId(this, profile.id)
+        ProfileManager.notifyChanged(this)
         SequencePrefs.save(this, profile.config)
         ContextCompat.startForegroundService(
             this,

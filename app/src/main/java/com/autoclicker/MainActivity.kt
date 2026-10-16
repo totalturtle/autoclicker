@@ -100,15 +100,14 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val json = result.data?.getStringExtra(ProfileManagerActivity.RESULT_PROFILE_JSON)
-            val config = ClickSequenceConfig.fromJsonString(json) ?: return@registerForActivityResult
-            points.clear()
-            points.addAll(config.points)
-            DelayUnit.fill(binding.etDelay, binding.spDelayUnit, config.globalDelayMs)
-            applyRepeatModeToUI(config)
-            pointAdapter.notifyDataSetChanged()
+            // 설정 JSON 대신 id만 받아 저장소에서 읽는다(영역 트리거가 있으면 JSON이 Intent 한도를 넘길 수 있음).
+            val profileId = result.data?.getStringExtra(ProfileManagerActivity.RESULT_PROFILE_ID)
+            val profile = ProfileManager.loadAll(this).firstOrNull { it.id == profileId }
+                ?: return@registerForActivityResult
+            applyConfigToUi(profile.config)
             persistSequence()
             Toast.makeText(this, R.string.toast_profile_loaded_generic, Toast.LENGTH_SHORT).show()
+            warnIfOffScreen(profile.config)
         }
     }
 
@@ -135,12 +134,9 @@ class MainActivity : AppCompatActivity() {
                 AutoClickAccessibilityService.ACTION_AUTO_PROFILE -> {
                     val name = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_PROFILE_NAME) ?: return
                     val cfg = SequencePrefs.load(this@MainActivity) ?: return
-                    points.clear()
-                    points.addAll(cfg.points)
-                    DelayUnit.fill(binding.etDelay, binding.spDelayUnit, cfg.globalDelayMs)
-                    applyRepeatModeToUI(cfg)
-                    pointAdapter.notifyDataSetChanged()
+                    applyConfigToUi(cfg)
                     Toast.makeText(this@MainActivity, getString(R.string.toast_auto_profile_loaded, name), Toast.LENGTH_SHORT).show()
+                    warnIfOffScreen(cfg)
                 }
                 AutoClickAccessibilityService.ACTION_COLOR_SAMPLED -> {
                     val target = intent.getStringExtra(AutoClickAccessibilityService.EXTRA_SAMPLE_TARGET) ?: return
@@ -177,23 +173,37 @@ class MainActivity : AppCompatActivity() {
         loadSequence()
         registerStatusReceiver()
         showFirstRunGuideIfNeeded()
+        handleLaunchIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        handleLaunchIntent(intent)
+    }
+
+    /**
+     * 오버레이/알림에서 넘어온 인텐트 처리.
+     * onCreate에서도 호출해야 앱이 꺼져 있던 상태에서 프로필 불러오기가 동작한다.
+     * 처리한 extra는 지워 화면 회전 시 다시 실행되지 않게 한다.
+     */
+    private fun handleLaunchIntent(intent: Intent) {
         if (intent.getBooleanExtra("show_premium_dialog", false)) {
+            intent.removeExtra("show_premium_dialog")
             showPremiumDialog()
         }
-        val profileId = intent.getStringExtra("load_profile_id")
-        if (profileId != null) {
-            val profile = ProfileManager.loadAll(this).firstOrNull { it.id == profileId }
-            if (profile != null) {
-                AdManager.showInterstitial(this) {
-                    SequencePrefs.save(this, profile.config)
-                    sendBroadcast(Intent(SequencePrefs.ACTION_POINTS_CHANGED).apply { setPackage(packageName) })
-                    Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
-                }
-            }
+        val profileId = intent.getStringExtra("load_profile_id") ?: return
+        intent.removeExtra("load_profile_id")
+        val profile = ProfileManager.loadAll(this).firstOrNull { it.id == profileId } ?: run {
+            Toast.makeText(this, R.string.toast_profile_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AdManager.showInterstitial(this) {
+            ProfileManager.setActiveId(this, profile.id)
+            applyConfigToUi(profile.config)
+            SequencePrefs.save(this, profile.config)
+            Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+            warnIfOffScreen(profile.config)
         }
     }
 
@@ -280,10 +290,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun syncPointsFromPrefs() {
         val cfg = SequencePrefs.load(this) ?: return
-        if (cfg.points == points) return  // 변경 없으면 스킵
+        if (cfg.points != points) {
+            points.clear()
+            points.addAll(cfg.points)
+            pointAdapter.notifyDataSetChanged()
+        }
+        // 딜레이·반복도 함께 반영한다. 포인트만 갱신하면 onPause의 persistSequence가
+        // "새 포인트 + 이전 화면의 딜레이/반복"이라는 섞인 설정을 저장해 버린다.
+        if (DelayUnit.readMs(binding.etDelay, binding.spDelayUnit, -1L) != cfg.globalDelayMs) {
+            DelayUnit.fill(binding.etDelay, binding.spDelayUnit, cfg.globalDelayMs)
+        }
+        val ui = readRawConfig()
+        if (ui.repeatMode != cfg.repeatMode ||
+            ui.repeatCount != cfg.repeatCount ||
+            (cfg.repeatMode == RepeatMode.DURATION && ui.repeatDurationMs != cfg.repeatDurationMs)
+        ) {
+            applyRepeatModeToUI(cfg)
+        }
+    }
+
+    /** 다른 방향에서 만든 프로필이면 경고창을 띄운다. */
+    private fun warnIfOffScreen(cfg: ClickSequenceConfig) {
+        val message = ScreenGuard.warning(this, cfg) ?: return
+        if (isFinishing || isDestroyed) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle("⚠️ 화면 밖 포인트")
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    /** 설정 전체(포인트·딜레이·반복)를 화면에 적용한다. */
+    private fun applyConfigToUi(cfg: ClickSequenceConfig) {
         points.clear()
         points.addAll(cfg.points)
         pointAdapter.notifyDataSetChanged()
+        DelayUnit.fill(binding.etDelay, binding.spDelayUnit, cfg.globalDelayMs)
+        applyRepeatModeToUI(cfg)
     }
 
     // ── OverlayService 항상 실행 ─────────────────────────────────────────

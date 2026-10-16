@@ -1,4 +1,4 @@
-﻿package com.realbtob.autoclicker
+package com.realbtob.autoclicker
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -52,7 +52,7 @@ class OverlayService : Service() {
         const val ACTION_AUTO_SHOW       = "com.autoclicker.OVERLAY_AUTO_SHOW"
         const val ACTION_PROFILE_PREV    = "com.realbtob.autoclicker.PROFILE_PREV"
         const val ACTION_PROFILE_NEXT    = "com.realbtob.autoclicker.PROFILE_NEXT"
-        private const val ACTION_PROFILE_CHANGED = "com.autoclicker.ACTION_PROFILE_CHANGED"
+        private const val ACTION_PROFILE_CHANGED = ProfileManager.ACTION_PROFILE_CHANGED
         private const val CHANNEL_ID  = "overlay_channel"
         private const val NOTIF_ID    = 1001
     }
@@ -70,7 +70,10 @@ class OverlayService : Service() {
     private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
     private var markersVisible        = true
-    private var activeProfileId: String? = null
+    /** 현재 프로필 id — prefs에 보관해 메인 화면·알림과 공유하고 서비스 재시작에도 유지한다. */
+    private var activeProfileId: String?
+        get() = ProfileManager.getActiveId(this)
+        set(value) = ProfileManager.setActiveId(this, value)
 
     // 영역 캡처 대기 중 다이얼로그 상태 임시 저장
     private var pendingRegionX = 0
@@ -1138,7 +1141,8 @@ class OverlayService : Service() {
                             .setNegativeButton("취소", null)
                             .setPositiveButton("저장") { _, _ ->
                                 ProfileManager.save(this, target.copy(config = cfg))
-                                sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
+                                activeProfileId = target.id
+                                ProfileManager.notifyChanged(this)
                                 Toast.makeText(this, "\"${target.name}\" 덮어씌웠습니다.", Toast.LENGTH_SHORT).show()
                             }
                             .create().also {
@@ -1179,15 +1183,25 @@ class OverlayService : Service() {
                 if (name.isNullOrEmpty()) {
                     Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 } else {
-                    // 최종 확인 팝업
+                    // 같은 이름이 이미 있으면 중복을 만들지 않고 그 프로필에 덮어쓴다.
+                    val existing = ProfileManager.loadAll(this).firstOrNull { it.name == name }
                     MaterialAlertDialogBuilder(themedCtx)
-                        .setTitle("저장 확인")
-                        .setMessage("「$name」으로 저장하시겠습니까?")
+                        .setTitle(if (existing != null) "덮어쓰기 확인" else "저장 확인")
+                        .setMessage(
+                            if (existing != null) "「$name」은 이미 있습니다. 덮어쓰시겠습니까?"
+                            else "「$name」으로 저장하시겠습니까?"
+                        )
                         .setNegativeButton("취소", null)
                         .setPositiveButton("저장") { _, _ ->
-                            ProfileManager.save(this, Profile(name = name, config = cfg))
-                            sendBroadcast(Intent(ACTION_PROFILE_CHANGED).apply { setPackage(packageName) })
-                            Toast.makeText(this, "\"$name\" 저장됐습니다.", Toast.LENGTH_SHORT).show()
+                            val target = existing?.copy(config = cfg) ?: Profile(name = name, config = cfg)
+                            ProfileManager.save(this, target)
+                            activeProfileId = target.id
+                            ProfileManager.notifyChanged(this)
+                            Toast.makeText(
+                                this,
+                                if (existing != null) "\"$name\" 덮어씌웠습니다." else "\"$name\" 저장됐습니다.",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                         .create().also {
                             it.window?.setType(overlayType())
@@ -1223,6 +1237,7 @@ class OverlayService : Service() {
                     refreshMarkers()
                     refreshProfileQuickButtons()
                     Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
+                    warnIfOffScreen(profile.config)
                 } else {
                     // 광고는 Activity 컨텍스트 필요 → MainActivity 경유
                     val intent = Intent(this, MainActivity::class.java).apply {
@@ -1316,6 +1331,7 @@ class OverlayService : Service() {
             sequenceJson = profile.config.toJsonString()
             refreshMarkers()
             refreshProfileQuickButtons()
+            warnIfOffScreen(profile.config)
             val cfg = SequencePrefs.load(this)
             when {
                 cfg == null || cfg.points.isEmpty() ->
@@ -1332,6 +1348,13 @@ class OverlayService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("load_profile_id", profile.id)
             })
+        }
+    }
+
+    /** 다른 화면 방향에서 만든 프로필이면 알려 준다(오버레이에서는 토스트). */
+    private fun warnIfOffScreen(cfg: ClickSequenceConfig) {
+        ScreenGuard.warning(this, cfg)?.let {
+            Toast.makeText(this, it, Toast.LENGTH_LONG).show()
         }
     }
 
