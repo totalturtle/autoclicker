@@ -34,6 +34,7 @@ class CoordPickerService : Service() {
         const val TARGET_END           = "end"
         const val TARGET_TRIGGER       = "trigger"
         const val TARGET_OVERLAY_ADD   = "overlay_add"
+        const val TARGET_SIMPLE        = "simple"
         const val TARGET_COLOR           = "color"
         const val TARGET_OVERLAY_COLOR   = "overlay_color"
         const val TARGET_REGION_CAPTURE  = "region_capture"
@@ -512,6 +513,14 @@ class CoordPickerService : Service() {
     private fun deliver(x: Int, y: Int, target: String) {
         dismiss()
         when (target) {
+            TARGET_SIMPLE -> {
+                SimpleModeActivity.pickedCoord = x to y
+                startActivity(Intent(this, SimpleModeActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            }
             TARGET_OVERLAY_ADD -> {
                 sendBroadcast(Intent(ACTION_OVERLAY_COORD_PICKED).apply {
                     setPackage(packageName)

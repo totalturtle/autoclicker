@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_simple_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingEnd="6dp">
+
+    <TextView
+        android:id="@+id/tvSimpleIndex"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@drawable/bg_simple_badge"
+        android:gravity="center"
+        android:text="1"
+        android:textColor="@color/simple_on_accent"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvSimpleCoord"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="가로 0 · 세로 0"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvSimpleGesture"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="탭"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/btnSimpleRemove"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/simple_remove_point"
+        android:padding="13dp"
+        android:src="@android:drawable/ic_menu_close_clear_cancel" />
+
+</LinearLayout>

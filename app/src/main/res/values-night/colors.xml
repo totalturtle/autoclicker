@@ -10,4 +10,15 @@
     <color name="surface_panel">#E6161B22</color>
     <color name="edit_mode_off_bg">#2221262D</color>
     <color name="edit_mode_off_stroke">#30363D</color>
+
+    <!-- 심플 모드 (어두운 테마) -->
+    <color name="simple_accent">#8B86F8</color>
+    <color name="simple_accent_soft">#232746</color>
+    <color name="simple_on_accent">#0D1117</color>
+    <color name="simple_danger">#FB7185</color>
+    <color name="simple_danger_soft">#2A1620</color>
+    <color name="simple_field">#161B22</color>
+    <color name="simple_card">#161B22</color>
+    <color name="simple_outline">#30363D</color>
+    <color name="simple_dash">#3B424C</color>
 </resources>

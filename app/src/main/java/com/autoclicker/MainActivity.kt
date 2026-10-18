@@ -166,6 +166,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 간단 모드로 시작하도록 돼 있으면 그 화면으로 넘긴다 (설정에서 바꿀 수 있다)
+        if (AppPreferences.startInSimpleMode(this) && intent.getStringExtra("load_profile_id") == null) {
+            startActivity(Intent(this, SimpleModeActivity::class.java))
+            finish()
+            return
+        }
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

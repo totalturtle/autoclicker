@@ -29,4 +29,15 @@
     <color name="status_running">#3FB950</color>
     <color name="status_idle">#8B949E</color>
     <color name="perm_warn">#D29922</color>
+
+    <!-- 심플 모드 -->
+    <color name="simple_accent">#4338CA</color>
+    <color name="simple_accent_soft">#EEF0FB</color>
+    <color name="simple_on_accent">#FFFFFF</color>
+    <color name="simple_danger">#E11D48</color>
+    <color name="simple_danger_soft">#FEF2F4</color>
+    <color name="simple_field">#FFFFFF</color>
+    <color name="simple_card">#F7F8FA</color>
+    <color name="simple_outline">#E4E7EC</color>
+    <color name="simple_dash">#C7CDD6</color>
 </resources>

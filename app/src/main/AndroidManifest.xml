@@ -60,6 +60,12 @@
 
         <!-- 프로필 관리 화면 -->
         <activity
+            android:name=".SimpleModeActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".ProfileManagerActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />

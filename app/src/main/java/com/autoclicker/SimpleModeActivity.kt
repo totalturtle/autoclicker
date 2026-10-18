@@ -1,0 +1,422 @@
+package com.realbtob.autoclicker
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.realbtob.autoclicker.databinding.ActivitySimpleModeBinding
+
+/**
+ * 간단 모드 화면.
+ *
+ * 누를 위치 · 간격 · 반복만 정하고 바로 시작한다. 클릭 엔진과 저장 포맷은
+ * 모든 기능 화면(MainActivity)과 똑같이 [SequencePrefs]를 쓰므로,
+ * 여기서 만든 설정을 모든 기능 화면에서 그대로 열어 다듬을 수 있다.
+ */
+class SimpleModeActivity : AppCompatActivity() {
+
+    companion object {
+        /** 좌표 피커가 고른 좌표 — [CoordPickerService]가 채워 넣는다 */
+        @Volatile var pickedCoord: Pair<Int, Int>? = null
+    }
+
+    private lateinit var binding: ActivitySimpleModeBinding
+
+    private val points = mutableListOf<ClickPoint>()
+    private var multiMode = false
+    private var repeatForever = true
+    private var isRunning = false
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                AutoClickAccessibilityService.ACTION_STARTED -> setRunningState(true)
+                AutoClickAccessibilityService.ACTION_STOP -> setRunningState(false)
+                RecordingService.ACTION_RECORDING_DONE -> {
+                    val json = intent.getStringExtra(RecordingService.EXTRA_RECORDED_POINTS) ?: return
+                    onRecordingDone(json)
+                }
+                SequencePrefs.ACTION_POINTS_CHANGED -> loadFromPrefs()
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        AppPreferences.applyTheme(this)
+        binding = ActivitySimpleModeBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        multiMode = AppPreferences.isSimpleMulti(this)
+        setupPointList()
+        setupButtons()
+        loadFromPrefs()
+        registerBroadcasts()
+        ensureOverlayServiceRunning()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        consumePickedCoord()
+        updatePermissionBanner()
+        setRunningState(AutoClickAccessibilityService.isRunning)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        persist()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        runCatching { unregisterReceiver(receiver) }
+    }
+
+    // ── 화면 구성 ────────────────────────────────────────────────────────
+
+    private fun setupButtons() {
+        binding.btnModeSingle.setOnClickListener { setMultiMode(false) }
+        binding.btnModeMulti.setOnClickListener { setMultiMode(true) }
+
+        binding.cardPickSingle.setOnClickListener { pickCoordinate() }
+        binding.btnAddPoint.setOnClickListener {
+            if (!PremiumManager.isPremium && points.size >= PremiumManager.FREE_POINT_LIMIT) {
+                Toast.makeText(this, R.string.premium_point_limit, Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            pickCoordinate()
+        }
+
+        binding.btnRepeatForever.setOnClickListener { setRepeatForever(true) }
+        binding.etRepeatCount.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) setRepeatForever(false)
+        }
+        binding.etRepeatCount.setOnClickListener { setRepeatForever(false) }
+
+        binding.btnSimpleRecord.setOnClickListener { startRecording() }
+        binding.btnSimpleStart.setOnClickListener { if (isRunning) stopClicking() else startClicking() }
+
+        binding.btnAdvancedMode.setOnClickListener {
+            persist()
+            AppPreferences.setSimpleModeStart(this, false)
+            Toast.makeText(this, R.string.simple_switched_to_advanced, Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+        }
+        binding.btnSimpleSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        binding.tvSimplePermission.setOnClickListener { openMissingPermission() }
+    }
+
+    private fun setupPointList() {
+        binding.rvSimplePoints.layoutManager = LinearLayoutManager(this)
+        binding.rvSimplePoints.adapter = PointAdapter()
+    }
+
+    private fun setMultiMode(multi: Boolean) {
+        multiMode = multi
+        AppPreferences.setSimpleMulti(this, multi)
+        // 한 곳 반복으로 돌아오면 첫 위치만 남긴다
+        if (!multi && points.size > 1) {
+            val first = points.first()
+            points.clear()
+            points.add(first)
+            persist()
+        }
+        refreshUi()
+    }
+
+    private fun setRepeatForever(forever: Boolean) {
+        repeatForever = forever
+        refreshRepeatUi()
+    }
+
+    private fun refreshUi() {
+        // 모드 버튼
+        styleAsPill(binding.btnModeSingle, selected = !multiMode)
+        styleAsPill(binding.btnModeMulti, selected = multiMode)
+
+        binding.cardPickSingle.visibility = if (multiMode) View.GONE else View.VISIBLE
+        binding.groupMulti.visibility = if (multiMode) View.VISIBLE else View.GONE
+
+        val first = points.firstOrNull()
+        if (first == null) {
+            binding.tvSingleTitle.setText(R.string.simple_pick_title)
+            binding.tvSingleHint.setText(R.string.simple_pick_hint)
+        } else {
+            binding.tvSingleTitle.text = getString(R.string.simple_picked_fmt, first.x, first.y)
+            binding.tvSingleHint.setText(R.string.simple_picked_hint)
+        }
+
+        binding.rvSimplePoints.adapter?.notifyDataSetChanged()
+        refreshRepeatUi()
+    }
+
+    private fun refreshRepeatUi() {
+        styleAsPill(binding.btnRepeatForever, selected = repeatForever)
+        binding.etRepeatCount.setBackgroundResource(
+            if (repeatForever) R.drawable.bg_simple_outline else R.drawable.bg_simple_field_focus
+        )
+        binding.etRepeatCount.setTextColor(
+            ContextCompat.getColor(this, if (repeatForever) R.color.text_secondary else R.color.simple_accent)
+        )
+        binding.tvRepeatHint.text = if (repeatForever) {
+            getString(R.string.simple_repeat_forever_hint)
+        } else {
+            getString(R.string.simple_repeat_count_hint_fmt, readRepeatCount())
+        }
+    }
+
+    private fun styleAsPill(view: TextView, selected: Boolean) {
+        view.setBackgroundResource(if (selected) R.drawable.bg_simple_pill else R.drawable.bg_simple_outline)
+        view.setTextColor(
+            ContextCompat.getColor(this, if (selected) R.color.simple_on_accent else R.color.text_secondary)
+        )
+    }
+
+    private fun setRunningState(running: Boolean) {
+        isRunning = running
+        binding.btnSimpleStart.setBackgroundResource(
+            if (running) R.drawable.bg_simple_danger else R.drawable.bg_simple_primary
+        )
+        binding.btnSimpleStart.setText(if (running) R.string.simple_running else R.string.simple_start)
+        binding.btnSimpleStart.textSize = if (running) 16f else 20f
+    }
+
+    // ── 좌표 지정 ────────────────────────────────────────────────────────
+
+    private fun pickCoordinate() {
+        if (!Settings.canDrawOverlays(this)) {
+            openMissingPermission()
+            return
+        }
+        startService(Intent(this, CoordPickerService::class.java).apply {
+            putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_SIMPLE)
+        })
+        moveTaskToBack(true)
+    }
+
+    private fun consumePickedCoord() {
+        val picked = pickedCoord ?: return
+        pickedCoord = null
+        val point = ClickPoint(x = picked.first, y = picked.second, gesture = GestureType.TAP)
+        if (multiMode) points.add(point) else {
+            points.clear()
+            points.add(point)
+        }
+        persist()
+        refreshUi()
+    }
+
+    // ── 녹화 ────────────────────────────────────────────────────────────
+
+    private fun startRecording() {
+        if (!Settings.canDrawOverlays(this)) {
+            openMissingPermission()
+            return
+        }
+        startService(Intent(this, RecordingService::class.java))
+        moveTaskToBack(true)
+    }
+
+    private fun onRecordingDone(json: String) {
+        val arr = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return
+        val recorded = (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            val gesture = runCatching { GestureType.valueOf(o.getString("gesture")) }.getOrDefault(GestureType.TAP)
+            ClickPoint(
+                x = o.getInt("x"),
+                y = o.getInt("y"),
+                gesture = gesture,
+                endX = o.optInt("endX", o.getInt("x")),
+                endY = o.optInt("endY", o.getInt("y")),
+                longPressDurationMs = o.optLong("longPressDurationMs", 450L),
+                swipeDurationMs = o.optLong("swipeDurationMs", 350L),
+                delayAfterMs = o.optLong("delayAfterMs", -1L)
+            )
+        }
+        if (recorded.isEmpty()) return
+        points.clear()
+        points.addAll(recorded)
+        if (points.size > 1 && !multiMode) setMultiMode(true)
+        persist()
+        refreshUi()
+        Toast.makeText(this, "${recorded.size}개 동작을 녹화했습니다.", Toast.LENGTH_SHORT).show()
+    }
+
+    // ── 시작 / 정지 ──────────────────────────────────────────────────────
+
+    private fun startClicking() {
+        if (points.isEmpty()) {
+            Toast.makeText(this, R.string.simple_need_point, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (AutoClickAccessibilityService.instance == null) {
+            openAccessibilitySettings()
+            return
+        }
+        if (!Settings.canDrawOverlays(this)) {
+            openMissingPermission()
+            return
+        }
+        val interval = readIntervalMs()
+        if (interval < 100L) {
+            Toast.makeText(this, R.string.simple_interval_min, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val config = buildConfig()
+        SequencePrefs.save(this, config)
+        val json = config.toJsonString()
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, OverlayService::class.java).apply {
+                putExtra(OverlayService.EXTRA_SEQUENCE_JSON, json)
+            }
+        )
+        sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
+            setPackage(packageName)
+            putExtra(AutoClickAccessibilityService.EXTRA_SEQUENCE_JSON, json)
+        })
+        setRunningState(true)
+        Toast.makeText(this, R.string.simple_started, Toast.LENGTH_SHORT).show()
+        moveTaskToBack(true)
+    }
+
+    private fun stopClicking() {
+        AutoClickAccessibilityService.instance?.requestStop()
+            ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply {
+                setPackage(packageName)
+            })
+        setRunningState(false)
+    }
+
+    // ── 설정 읽기/쓰기 ───────────────────────────────────────────────────
+
+    private fun readIntervalMs(): Long =
+        DelayUnit.readMs(binding.etSimpleInterval, binding.spSimpleUnit, 1000L)
+
+    private fun readRepeatCount(): Int =
+        binding.etRepeatCount.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+
+    private fun buildConfig(): ClickSequenceConfig = ClickSequenceConfig(
+        points = points.toList(),
+        globalDelayMs = readIntervalMs().coerceAtLeast(100L),
+        repeatCount = if (repeatForever) 0 else readRepeatCount(),
+        repeatMode = RepeatMode.COUNT,
+        repeatDurationMs = 0L
+    )
+
+    private fun persist() {
+        if (points.isEmpty()) return
+        SequencePrefs.save(this, buildConfig())
+    }
+
+    private fun loadFromPrefs() {
+        val cfg = SequencePrefs.load(this)
+        points.clear()
+        if (cfg != null) {
+            points.addAll(cfg.points)
+            DelayUnit.fill(binding.etSimpleInterval, binding.spSimpleUnit, cfg.globalDelayMs)
+            repeatForever = cfg.repeatCount <= 0
+            if (!repeatForever) binding.etRepeatCount.setText(cfg.repeatCount.toString())
+            if (points.size > 1) multiMode = true
+        }
+        refreshUi()
+    }
+
+    // ── 권한 ────────────────────────────────────────────────────────────
+
+    private fun updatePermissionBanner() {
+        val missing = AutoClickAccessibilityService.instance == null || !Settings.canDrawOverlays(this)
+        binding.tvSimplePermission.visibility = if (missing) View.VISIBLE else View.GONE
+    }
+
+    private fun openMissingPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName")
+                    )
+                )
+            }
+            return
+        }
+        openAccessibilitySettings()
+    }
+
+    private fun openAccessibilitySettings() {
+        Toast.makeText(this, R.string.toast_enable_accessibility, Toast.LENGTH_LONG).show()
+        runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    }
+
+    private fun ensureOverlayServiceRunning() {
+        if (!Settings.canDrawOverlays(this)) return
+        ContextCompat.startForegroundService(this, Intent(this, OverlayService::class.java))
+    }
+
+    private fun registerBroadcasts() {
+        val filter = IntentFilter().apply {
+            addAction(AutoClickAccessibilityService.ACTION_STARTED)
+            addAction(AutoClickAccessibilityService.ACTION_STOP)
+            addAction(RecordingService.ACTION_RECORDING_DONE)
+            addAction(SequencePrefs.ACTION_POINTS_CHANGED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+    }
+
+    // ── 위치 목록 ────────────────────────────────────────────────────────
+
+    private inner class PointAdapter : RecyclerView.Adapter<PointAdapter.VH>() {
+
+        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val index: TextView = view.findViewById(R.id.tvSimpleIndex)
+            val coord: TextView = view.findViewById(R.id.tvSimpleCoord)
+            val gesture: TextView = view.findViewById(R.id.tvSimpleGesture)
+            val remove: ImageView = view.findViewById(R.id.btnSimpleRemove)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
+            VH(layoutInflater.inflate(R.layout.item_simple_point, parent, false))
+
+        override fun getItemCount(): Int = points.size
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val point = points[position]
+            holder.index.text = (position + 1).toString()
+            holder.coord.text = getString(R.string.simple_picked_fmt, point.x, point.y)
+            holder.gesture.setText(
+                when (point.gesture) {
+                    GestureType.LONG_PRESS -> R.string.gesture_long_simple
+                    GestureType.SWIPE -> R.string.gesture_swipe_simple
+                    else -> R.string.gesture_tap_simple
+                }
+            )
+            holder.remove.setOnClickListener {
+                val index = holder.bindingAdapterPosition
+                if (index !in points.indices) return@setOnClickListener
+                points.removeAt(index)
+                persist()
+                refreshUi()
+            }
+        }
+    }
+}

@@ -24,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         setupThemeSelector()
+        setupStartScreenToggle()
         setupAutoLinkToggle()
         setupInfoSection()
         setupPremiumSection()
@@ -33,6 +34,18 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    private fun setupStartScreenToggle() {
+        binding.switchStartSimple.isChecked = AppPreferences.startInSimpleMode(this)
+        binding.switchStartSimple.setOnCheckedChangeListener { _, isChecked ->
+            AppPreferences.setSimpleModeStart(this, isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) R.string.simple_switched_to_simple else R.string.simple_switched_to_advanced,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun setupAutoLinkToggle() {
