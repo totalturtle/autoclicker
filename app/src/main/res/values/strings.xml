@@ -118,6 +118,7 @@
     <string name="simple_overlay_count">번 누름</string>
     <string name="simple_overlay_stop">멈추기</string>
     <string name="simple_overlay_start">시작</string>
+    <string name="go_simple_mode">‹ 간단 모드</string>
     <string name="toast_profile_loaded">\'%s\' 프로필이 로드되었습니다.</string>
     <string name="toast_app_linked">\'%s\' 앱에 연동됨</string>
     <string name="toast_app_link_removed">앱 연동이 해제됨</string>

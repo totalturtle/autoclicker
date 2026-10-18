@@ -496,6 +496,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        binding.btnSimpleMode.setOnClickListener {
+            persistSequence()
+            AppPreferences.setSimpleModeStart(this, true)
+            Toast.makeText(this, R.string.simple_switched_to_simple, Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SimpleModeActivity::class.java))
+            finish()
+        }
+
         binding.btnProfileManager.setOnClickListener {
             profileManagerLauncher.launch(Intent(this, ProfileManagerActivity::class.java))
         }

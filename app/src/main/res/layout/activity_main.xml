@@ -31,6 +31,17 @@
             android:shadowDy="0"
             android:shadowRadius="0" />
 
+        <TextView
+            android:id="@+id/btnSimpleMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="10dp"
+            android:text="@string/go_simple_mode"
+            android:textColor="@color/simple_accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
         <ImageButton
             android:id="@+id/btnSettings"
             android:layout_width="44dp"
