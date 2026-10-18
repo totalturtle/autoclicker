@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.*
@@ -70,6 +71,8 @@ class OverlayService : Service() {
     private var pendingRegionPickIndex = -1
     private var sequenceJson: String? = null
     private var markersVisible        = true
+    private var simplePanelMode       = false
+    private var simpleCollapsed       = false
     /** 현재 프로필 id — prefs에 보관해 메인 화면·알림과 공유하고 서비스 재시작에도 유지한다. */
     private var activeProfileId: String?
         get() = ProfileManager.getActiveId(this)
@@ -104,6 +107,7 @@ class OverlayService : Service() {
                 AutoClickAccessibilityService.ACTION_CLICK_COUNT -> {
                     val count = intent.getIntExtra(AutoClickAccessibilityService.EXTRA_COUNT, 0)
                     overlayView.findViewById<TextView>(R.id.tvOverlayStatus)?.text = count.toString()
+                    overlayView.findViewById<TextView>(R.id.tvSimpleOverlayCount)?.text = count.toString()
                 }
                 AutoClickAccessibilityService.ACTION_STARTED -> setRunningState(true)
                 AutoClickAccessibilityService.ACTION_STOP -> setRunningState(false)
@@ -192,10 +196,12 @@ class OverlayService : Service() {
         // 기본 상태: 간소화 + 마커 숨김
         setPanelState(1)
         setMarkersVisible(false)
+        applyPanelMode()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         refreshMarkers()
+        applyPanelMode()
         return START_STICKY
     }
 
@@ -259,31 +265,11 @@ class OverlayService : Service() {
             removeLastPoint()
         }
 
-        overlayView.findViewById<Button>(R.id.btnOverlayToggle).setOnTouchListener { v, event ->
+        val toggleTouch = View.OnTouchListener { v, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    val now = SystemClock.elapsedRealtime()
-                    if (now - lastToggleMs >= 400L) {
-                        lastToggleMs = now
-                        v.isPressed = true
-                        if (isRunning) {
-                            setRunningState(false)
-                            AutoClickAccessibilityService.instance?.requestStop()
-                                ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
-                        } else {
-                            val cfg = SequencePrefs.load(this)
-                            when {
-                                cfg == null || cfg.points.isEmpty() ->
-                                    Toast.makeText(this, "먼저 클릭 포인트를 추가해 주세요.", Toast.LENGTH_SHORT).show()
-                                AutoClickAccessibilityService.instance == null ->
-                                    promptEnableAccessibility()
-                                else ->
-                                    sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
-                                        setPackage(packageName)
-                                    })
-                            }
-                        }
-                    }
+                    v.isPressed = true
+                    toggleClicking()
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -293,6 +279,8 @@ class OverlayService : Service() {
                 else -> false
             }
         }
+        overlayView.findViewById<Button>(R.id.btnOverlayToggle).setOnTouchListener(toggleTouch)
+        overlayView.findViewById<Button>(R.id.btnSimpleOverlayToggle).setOnTouchListener(toggleTouch)
 
         overlayView.findViewById<ImageButton>(R.id.btnOverlayToggleMarkers).setOnClickListener {
             setMarkersVisible(!markersVisible)
@@ -374,6 +362,66 @@ class OverlayService : Service() {
         }
     }
 
+    /** 시작/정지 토글 — 기본 패널과 간단 모드 패널이 같이 쓴다 */
+    private fun toggleClicking() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastToggleMs < 400L) return
+        lastToggleMs = now
+        if (isRunning) {
+            setRunningState(false)
+            AutoClickAccessibilityService.instance?.requestStop()
+                ?: sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+            return
+        }
+        val cfg = SequencePrefs.load(this)
+        when {
+            cfg == null || cfg.points.isEmpty() ->
+                Toast.makeText(this, "먼저 클릭 포인트를 추가해 주세요.", Toast.LENGTH_SHORT).show()
+            AutoClickAccessibilityService.instance == null ->
+                promptEnableAccessibility()
+            else ->
+                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_START).apply {
+                    setPackage(packageName)
+                })
+        }
+    }
+
+    /**
+     * 간단 모드에서는 패널 대신 "누른 횟수 + 멈추기" 하나만 띄운다.
+     * 설정에서 시작 화면을 바꾸면 서비스가 다시 시작될 때 반영된다.
+     */
+    private fun applyPanelMode() {
+        simplePanelMode = AppPreferences.startInSimpleMode(this)
+        val simple = overlayView.findViewById<View>(R.id.layoutSimplePanel)
+        val full = listOf(
+            R.id.overlayDragHandle, R.id.layoutCollapsibleTop, R.id.layoutProfileQuick,
+            R.id.btnOverlayToggle, R.id.layoutCollapsibleBottom, R.id.btnOverlayPower
+        )
+        if (simplePanelMode) {
+            full.forEach { overlayView.findViewById<View>(it)?.visibility = View.GONE }
+            simple.visibility = View.VISIBLE
+            overlayView.setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            simple.visibility = View.GONE
+            overlayView.setBackgroundResource(R.drawable.bg_overlay_panel)
+            overlayView.findViewById<View>(R.id.overlayDragHandle)?.visibility = View.VISIBLE
+            overlayView.findViewById<View>(R.id.btnOverlayToggle)?.visibility = View.VISIBLE
+            overlayView.findViewById<View>(R.id.btnOverlayPower)?.visibility = View.VISIBLE
+            setPanelState(panelState)
+        }
+        setSimpleCollapsed(simpleCollapsed)
+        setRunningState(isRunning)
+    }
+
+    /** 간단 모드 패널 접기/펼치기 — 접으면 동그란 버튼만 남는다 */
+    private fun setSimpleCollapsed(collapsed: Boolean) {
+        simpleCollapsed = collapsed
+        val vis = if (collapsed) View.GONE else View.VISIBLE
+        overlayView.findViewById<View>(R.id.tvSimpleOverlayCount)?.visibility = vis
+        overlayView.findViewById<View>(R.id.tvSimpleOverlayCountLabel)?.visibility = vis
+        overlayView.findViewById<View>(R.id.tvSimpleOverlayLabel)?.visibility = vis
+    }
+
     private fun setRunningState(running: Boolean) {
         isRunning = running
         overlayView.findViewById<Button>(R.id.btnOverlayToggle)?.apply {
@@ -381,6 +429,22 @@ class OverlayService : Service() {
             setTextColor(if (running) 0xFFF85149.toInt() else 0xFF3FB950.toInt())
         }
         if (!running) overlayView.findViewById<TextView>(R.id.tvOverlayStatus)?.text = "0"
+        overlayView.findViewById<Button>(R.id.btnSimpleOverlayToggle)?.apply {
+            text = if (running) "■" else "▶"
+            setBackgroundResource(
+                if (running) R.drawable.bg_simple_circle_stop else R.drawable.bg_simple_circle_start
+            )
+        }
+        overlayView.findViewById<TextView>(R.id.tvSimpleOverlayLabel)?.apply {
+            setText(if (running) R.string.simple_overlay_stop else R.string.simple_overlay_start)
+            setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    this@OverlayService,
+                    if (running) R.color.simple_danger else R.color.simple_accent
+                )
+            )
+        }
+        if (!running) overlayView.findViewById<TextView>(R.id.tvSimpleOverlayCount)?.text = "0"
         // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
         val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }
@@ -397,7 +461,12 @@ class OverlayService : Service() {
     }
 
     private fun setupPanelDrag() {
-        val handle = overlayView.findViewById<View>(R.id.overlayDragHandle)
+        attachDrag(overlayView.findViewById(R.id.overlayDragHandle)) { setPanelState((panelState + 1) % 3) }
+        attachDrag(overlayView.findViewById(R.id.tvSimpleHandle)) { setSimpleCollapsed(!simpleCollapsed) }
+    }
+
+    /** 핸들을 끌면 패널 이동, 그냥 누르면 [onTap] */
+    private fun attachDrag(handle: View, onTap: () -> Unit) {
         var startX = 0f; var startY = 0f; var initX = 0; var initY = 0
         var wasDrag = false
         val tapSlop = (resources.displayMetrics.density * 6).toInt()
@@ -421,7 +490,7 @@ class OverlayService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!wasDrag) setPanelState((panelState + 1) % 3)
+                    if (!wasDrag) onTap()
                     true
                 }
                 else -> false

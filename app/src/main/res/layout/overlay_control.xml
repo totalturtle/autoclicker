@@ -188,6 +188,69 @@
 
     </LinearLayout>
 
+    <!-- 간단 모드 전용 패널 -->
+    <LinearLayout
+        android:id="@+id/layoutSimplePanel"
+        android:layout_width="76dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:background="@drawable/bg_simple_overlay"
+        android:elevation="8dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvSimpleHandle"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center"
+            android:text="· · ·"
+            android:textColor="@color/text_hint"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvSimpleOverlayCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="@color/text_primary"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvSimpleOverlayCountLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/simple_overlay_count"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnSimpleOverlayToggle"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_simple_circle_stop"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="■"
+            android:textColor="@color/simple_on_accent"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/tvSimpleOverlayLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/simple_overlay_stop"
+            android:textColor="@color/simple_danger"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
     <!-- 앱 종료 (항상 표시) -->
     <ImageButton
         android:id="@+id/btnOverlayPower"
