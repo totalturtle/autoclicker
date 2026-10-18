@@ -601,12 +601,17 @@ class MainActivity : AppCompatActivity() {
     // ── 포인트 추가 다이얼로그 ───────────────────────────────────────────
 
     private fun showAddPointDialog(prefill: PointDialogState? = null) {
+        // 딜레이 칸을 비우면 공통 딜레이가 쓰인다는 것을 값과 함께 보여 준다
         if (points.size >= 50) {
             Toast.makeText(this, R.string.toast_max_points, Toast.LENGTH_SHORT).show()
             return
         }
         val dialogBinding = DialogAddPointBinding.inflate(LayoutInflater.from(this))
         dialogBinding.layoutPointOrder.visibility = View.GONE
+        dialogBinding.layoutDialogDelay.helperText = getString(
+            R.string.helper_delay_uses_global_fmt,
+            DelayUnit.format(DelayUnit.readMs(binding.etDelay, binding.spDelayUnit, 1000L))
+        )
 
         fun applyGestureUi(position: Int) {
             dialogBinding.tilDialogTapDur.visibility = if (position == 0) View.VISIBLE else View.GONE

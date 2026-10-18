@@ -102,6 +102,8 @@ class PointSettingsActivity : AppCompatActivity() {
         d.etDialogY.setText(point.y.toString())
         d.etDialogLabel.setText(point.label)
         DelayUnit.fill(d.etDialogDelayAfter, d.spDialogDelayUnit, point.delayAfterMs)
+        d.layoutDialogDelay.helperText =
+            getString(R.string.helper_delay_uses_global_fmt, DelayUnit.format(cfg.globalDelayMs))
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())
         DelayUnit.fill(d.etDialogRepeatDelay, d.spDialogRepeatDelayUnit, point.repeatDelayMs)

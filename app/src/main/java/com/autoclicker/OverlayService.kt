@@ -707,6 +707,8 @@ class OverlayService : Service() {
         d.etDialogY.setText(point.y.toString())
         d.etDialogLabel.setText(point.label)
         DelayUnit.fill(d.etDialogDelayAfter, d.spDialogDelayUnit, point.delayAfterMs)
+        d.layoutDialogDelay.helperText =
+            getString(R.string.helper_delay_uses_global_fmt, DelayUnit.format(cfg.globalDelayMs))
         if (point.randomVarianceMs > 0) d.etDialogVariance.setText(point.randomVarianceMs.toString())
         if (point.coordinateVariancePx > 0) d.etDialogCoordVariance.setText(point.coordinateVariancePx.toString())
         d.etDialogPointRepeat.setText(point.pointRepeatCount.toString())

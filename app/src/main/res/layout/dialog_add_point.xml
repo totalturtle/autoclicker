@@ -249,10 +249,13 @@
                 android:layout_marginBottom="8dp">
 
                 <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutDialogDelay"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:hint="딜레이"
+                    app:helperText="@string/helper_delay_uses_global"
+                    app:helperTextEnabled="true"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
                     <com.google.android.material.textfield.TextInputEditText
