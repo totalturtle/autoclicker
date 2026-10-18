@@ -74,6 +74,11 @@
     <string name="dialog_overwrite_profile_msg">\'%s\'에 현재 설정을 덮어쓰시겠습니까?</string>
     <string name="toast_profile_overwritten">\'%s\' 덮어썼습니다</string>
     <string name="toast_profile_missing">프로필을 찾을 수 없습니다.</string>
+    <string name="section_auto_link">앱 연동 자동 적용</string>
+    <string name="hint_auto_link">연동해 둔 앱을 실행하면 해당 프로필을 자동으로 불러옵니다. 끄면 프로필을 직접 고를 때만 바뀝니다(연동 설정은 지워지지 않습니다).</string>
+    <string name="label_auto_link_toggle">연동된 앱 실행 시 프로필 자동 전환</string>
+    <string name="toast_auto_link_on">앱 연동 자동 적용을 켰습니다.</string>
+    <string name="toast_auto_link_off">앱 연동 자동 적용을 껐습니다. 프로필은 직접 고를 때만 바뀝니다.</string>
     <string name="toast_profile_loaded">\'%s\' 프로필이 로드되었습니다.</string>
     <string name="toast_app_linked">\'%s\' 앱에 연동됨</string>
     <string name="toast_app_link_removed">앱 연동이 해제됨</string>

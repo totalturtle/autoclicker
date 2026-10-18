@@ -8,6 +8,8 @@ import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.provider.Settings
+import android.util.Log
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Path
@@ -55,8 +57,43 @@ class AutoClickAccessibilityService : AccessibilityService() {
         const val EXTRA_REGION_TARGET = "region_target"
         const val EXTRA_REGION_PIXELS = "region_pixels"
 
+        private const val TAG_AUTO = "AutoProfile"
+
+        /**
+         * 사용자가 직접 설정을 바꾼 앱으로 돌아왔을 때, 이 시간 안이면 "잠깐 나갔다 온 것"으로 보고
+         * 연동 프로필을 다시 적용하지 않는다. 이보다 오래 다른 일을 하다 돌아오면 새 세션으로 본다.
+         */
+        private const val RESUME_GRACE_MS = 60_000L
+
+        /** 사용자가 직접 설정을 바꾼 세션은 이만큼 더 오래 보호한다 */
+        private const val USER_CHOICE_GRACE_MS = 30 * 60_000L
+
+        private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
+
         var instance: AutoClickAccessibilityService? = null
             private set
+
+        /**
+         * 사용자가 직접 설정을 바꿨을 때(프로필 수동 로드, 포인트 추가·수정·삭제) 호출한다.
+         * 지금 쓰고 있는 앱에 대해서는 연동 프로필 자동 적용을 멈춘다.
+         */
+        fun onUserChangedSequence() {
+            instance?.pauseAutoLinkForCurrentApp()
+        }
+
+        /**
+         * 사용자가 프로필을 직접 불러왔을 때 호출한다.
+         * 지금 쓰는 앱에 연동된 바로 그 프로필을 고른 경우에는 자동 적용을 되살리고,
+         * 다른 프로필을 고른 경우에는 멈춘다.
+         */
+        fun onUserLoadedProfile(profile: Profile) {
+            val inst = instance ?: return
+            if (profile.linkedAppPackage.isNotEmpty() && profile.linkedAppPackage == inst.sessionPkg) {
+                inst.userTouchedSession = false   // 연동 프로필을 직접 고름 → 보호할 것이 없다
+            } else {
+                inst.pauseAutoLinkForCurrentApp()
+            }
+        }
 
         val isRunning: Boolean
             get() = instance?.isClickJobActive == true
@@ -66,6 +103,15 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
     /** 자동 연동을 마지막으로 적용한(또는 적용을 시도한) 포그라운드 앱 */
     @Volatile private var lastAutoPackage = ""
+
+    /** 지금 "사용 중"으로 보고 있는 앱 — 이 앱에 대해서는 연동 프로필을 이미 적용했다 */
+    @Volatile private var sessionPkg = ""
+
+    /** 그 앱을 떠난 시각 — 잠깐 나갔다 온 것인지, 한참 뒤 다시 실행한 것인지 가른다 */
+    @Volatile private var sessionLeftAtMs = 0L
+
+    /** 이번 세션에서 사용자가 직접 프로필을 고르거나 포인트를 바꿨는가 */
+    @Volatile private var userTouchedSession = false
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var clickJob: Job? = null
@@ -121,8 +167,13 @@ class AutoClickAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         val pkg: String = when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
-                event.packageName?.toString() ?: return
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                val p = event.packageName?.toString() ?: return
+                // 키보드·시스템 UI·오버레이가 뜨는 것은 앱 전환이 아니다.
+                // (키보드를 앱 전환으로 보면 입력 후 닫힐 때 연동 프로필이 다시 적용된다)
+                if (!isAppWindow(event.windowId, p)) return
+                p
+            }
             AccessibilityEvent.TYPE_WINDOWS_CHANGED ->
                 windows?.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
                     ?.maxByOrNull { it.layer }
@@ -142,13 +193,39 @@ class AutoClickAccessibilityService : AccessibilityService() {
      * onAccessibilityEvent와 폴링이 같은 상태(lastAutoPackage)를 공유해 이중 트리거도 막는다.
      */
     private fun applyAutoProfile(pkg: String) {
+        if (!AppPreferences.isAutoLinkEnabled(this)) return
         if (pkg == packageName || pkg == lastAutoPackage) return
+        // 폴링 경로에서도 키보드·시스템 UI는 앱 전환으로 보지 않는다
+        if (pkg == SYSTEM_UI_PACKAGE || pkg == currentImePackage()) return
+        val previous = lastAutoPackage
         lastAutoPackage = pkg
+        val now = System.currentTimeMillis()
 
+        // 쓰던 앱을 떠났다 — 언제 떠났는지 기록해 둔다
+        if (previous.isNotEmpty() && previous == sessionPkg) sessionLeftAtMs = now
+
+        if (pkg == sessionPkg) {
+            // 이미 이 앱 세션 중이다. 엣지 패널·게임 부스터·키보드·우리 앱 화면처럼
+            // 잠깐 다른 창을 거쳐 돌아온 것이라면 "다시 실행"이 아니므로 그대로 둔다.
+            val away = now - sessionLeftAtMs
+            val grace = if (userTouchedSession) USER_CHOICE_GRACE_MS else RESUME_GRACE_MS
+            if (away < grace) {
+                if (BuildConfig.DEBUG) Log.d(TAG_AUTO, "skip(return after ${away}ms): $pkg")
+                return
+            }
+        }
+
+        // 연동된 프로필이 있는 앱만 세션 주인이 된다.
+        // 엣지 패널·게임 부스터처럼 잠깐 뜨는 창은 지나가는 것일 뿐이므로
+        // 세션을 빼앗지 않고, 원래 앱으로 돌아올 때 "복귀"로 인식되게 둔다.
         val profile = ProfileManager.findByApp(this, pkg) ?: return
+
+        sessionPkg = pkg
+        userTouchedSession = false
+        if (BuildConfig.DEBUG) Log.d(TAG_AUTO, "apply: ${profile.name} for $pkg")
         ProfileManager.setActiveId(this, profile.id)
         ProfileManager.notifyChanged(this)
-        SequencePrefs.save(this, profile.config)
+        SequencePrefs.save(this, profile.config, byUser = false)
         ContextCompat.startForegroundService(
             this,
             Intent(this, OverlayService::class.java).apply { action = OverlayService.ACTION_AUTO_SHOW }
@@ -157,6 +234,33 @@ class AutoClickAccessibilityService : AccessibilityService() {
             setPackage(packageName)
             putExtra(EXTRA_PROFILE_NAME, profile.name)
         })
+    }
+
+    /**
+     * 그 창이 "앱 화면"인지 판단한다.
+     * 창 목록에서 찾으면 타입으로 보고(키보드=TYPE_INPUT_METHOD, 상태바·최근앱=TYPE_SYSTEM),
+     * 못 찾으면 현재 키보드 앱과 시스템 UI 패키지명으로 거른다.
+     */
+    private fun isAppWindow(windowId: Int, pkg: String): Boolean {
+        val win = windows?.firstOrNull { it.id == windowId }
+        if (win != null) return win.type == AccessibilityWindowInfo.TYPE_APPLICATION
+        return pkg != currentImePackage() && pkg != SYSTEM_UI_PACKAGE
+    }
+
+    /** 현재 선택된 키보드(IME)의 패키지명 */
+    private fun currentImePackage(): String? =
+        runCatching {
+            Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+                ?.substringBefore('/')
+                ?.takeIf { it.isNotEmpty() }
+        }.getOrNull()
+
+    /** 사용자가 직접 프로필을 고르거나 포인트를 바꿨다 → 지금 앱에 대한 자동 적용을 멈춘다. */
+    private fun pauseAutoLinkForCurrentApp() {
+        if (sessionPkg.isNotEmpty() && !userTouchedSession) {
+            userTouchedSession = true
+            if (BuildConfig.DEBUG) Log.d(TAG_AUTO, "user changed settings in session: $sessionPkg")
+        }
     }
 
     override fun onInterrupt() {

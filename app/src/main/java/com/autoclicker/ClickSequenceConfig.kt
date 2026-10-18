@@ -1,4 +1,4 @@
-package com.realbtob.autoclicker
+﻿package com.realbtob.autoclicker
 
 import android.content.Context
 import android.content.Intent
@@ -223,10 +223,16 @@ object SequencePrefs {
     fun load(context: Context): ClickSequenceConfig? =
         ClickSequenceConfig.fromJsonString(loadRawJson(context))
 
-    fun save(context: Context, config: ClickSequenceConfig) {
+    /**
+     * [byUser]가 true면 사용자가 직접 바꾼 것으로 보고, 지금 쓰는 앱에 대한
+     * 연동 프로필 자동 적용을 멈춘다(사용자의 선택을 덮어쓰지 않기 위해).
+     * 자동 연동이 스스로 저장할 때만 false를 넘긴다.
+     */
+    fun save(context: Context, config: ClickSequenceConfig, byUser: Boolean = true) {
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_CONFIG, config.toJsonString())
             .apply()
+        if (byUser) AutoClickAccessibilityService.onUserChangedSequence()
         context.sendBroadcast(Intent(ACTION_POINTS_CHANGED).apply { setPackage(context.packageName) })
     }
 

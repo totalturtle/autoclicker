@@ -106,6 +106,7 @@ class MainActivity : AppCompatActivity() {
                 ?: return@registerForActivityResult
             applyConfigToUi(profile.config)
             persistSequence()
+            AutoClickAccessibilityService.onUserLoadedProfile(profile)
             Toast.makeText(this, R.string.toast_profile_loaded_generic, Toast.LENGTH_SHORT).show()
             warnIfOffScreen(profile.config)
         }
@@ -202,6 +203,7 @@ class MainActivity : AppCompatActivity() {
             ProfileManager.setActiveId(this, profile.id)
             applyConfigToUi(profile.config)
             SequencePrefs.save(this, profile.config)
+            AutoClickAccessibilityService.onUserLoadedProfile(profile)
             Toast.makeText(this, "\"${profile.name}\" 불러왔습니다.", Toast.LENGTH_SHORT).show()
             warnIfOffScreen(profile.config)
         }

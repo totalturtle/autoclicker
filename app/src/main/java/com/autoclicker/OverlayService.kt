@@ -1233,6 +1233,7 @@ class OverlayService : Service() {
                 if (PremiumManager.isPremium) {
                     activeProfileId = profile.id
                     SequencePrefs.save(this, profile.config)
+                    AutoClickAccessibilityService.onUserLoadedProfile(profile)
                     sequenceJson = profile.config.toJsonString()
                     refreshMarkers()
                     refreshProfileQuickButtons()
@@ -1328,6 +1329,7 @@ class OverlayService : Service() {
         if (PremiumManager.isPremium) {
             activeProfileId = profile.id
             SequencePrefs.save(this, profile.config)
+            AutoClickAccessibilityService.onUserLoadedProfile(profile)
             sequenceJson = profile.config.toJsonString()
             refreshMarkers()
             refreshProfileQuickButtons()

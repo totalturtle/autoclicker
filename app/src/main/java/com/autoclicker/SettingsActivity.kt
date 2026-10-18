@@ -24,6 +24,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         setupThemeSelector()
+        setupAutoLinkToggle()
         setupInfoSection()
         setupPremiumSection()
         setupDebugPremiumToggle()
@@ -32,6 +33,18 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true
+    }
+
+    private fun setupAutoLinkToggle() {
+        binding.switchAutoLink.isChecked = AppPreferences.isAutoLinkEnabled(this)
+        binding.switchAutoLink.setOnCheckedChangeListener { _, isChecked ->
+            AppPreferences.setAutoLinkEnabled(this, isChecked)
+            Toast.makeText(
+                this,
+                if (isChecked) R.string.toast_auto_link_on else R.string.toast_auto_link_off,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun setupThemeSelector() {
