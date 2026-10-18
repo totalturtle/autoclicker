@@ -64,6 +64,7 @@ class AutoClickAccessibilityService : AccessibilityService() {
 
     val isClickJobActive: Boolean get() = clickJob?.isActive == true
 
+    /** 자동 연동을 마지막으로 적용한(또는 적용을 시도한) 포그라운드 앱 */
     @Volatile private var lastAutoPackage = ""
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -128,16 +129,17 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     ?.root?.packageName?.toString() ?: return
             else -> return
         }
-        if (pkg == packageName) {
-            lastAutoPackage = ""
-            return
-        }
         applyAutoProfile(pkg)
     }
 
     /**
      * 포그라운드 앱(pkg)에 연결된 프로필이 있으면 적용한다.
-     * onAccessibilityEvent와 폴링이 같은 상태(lastAutoPackage)를 공유해 이중 트리거를 막는다.
+     *
+     * 적용 시점은 "다른 앱에서 그 앱으로 전환될 때" 한 번뿐이다.
+     * 우리 앱 화면(메인/설정)과 오버레이는 lastAutoPackage를 건드리지 않으므로,
+     * 연동된 앱을 쓰는 도중에 사용자가 직접 다른 프로필을 불러왔더라도
+     * 오버레이를 조작했다는 이유로 연동 프로필이 다시 덮어쓰이지 않는다.
+     * onAccessibilityEvent와 폴링이 같은 상태(lastAutoPackage)를 공유해 이중 트리거도 막는다.
      */
     private fun applyAutoProfile(pkg: String) {
         if (pkg == packageName || pkg == lastAutoPackage) return
