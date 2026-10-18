@@ -50,6 +50,8 @@ class OverlayService : Service() {
     companion object {
         const val EXTRA_SEQUENCE_JSON = "extra_sequence_json"
         const val ACTION_TOGGLE_MARKERS  = "com.autoclicker.OVERLAY_TOGGLE_MARKERS"
+        /** 지정한 위치를 화면에서 바로 확인할 수 있게 마커를 켠다 */
+        const val ACTION_SHOW_MARKERS    = "com.autoclicker.OVERLAY_SHOW_MARKERS"
         const val ACTION_AUTO_SHOW       = "com.autoclicker.OVERLAY_AUTO_SHOW"
         const val ACTION_PROFILE_PREV    = "com.realbtob.autoclicker.PROFILE_PREV"
         const val ACTION_PROFILE_NEXT    = "com.realbtob.autoclicker.PROFILE_NEXT"
@@ -118,6 +120,7 @@ class OverlayService : Service() {
                 PointSettingsActivity.ACTION_POINT_UPDATED -> refreshMarkers()
                 SequencePrefs.ACTION_POINTS_CHANGED -> refreshMarkers()
                 ACTION_TOGGLE_MARKERS -> setMarkersVisible(!markersVisible)
+                ACTION_SHOW_MARKERS -> { refreshMarkers(); setMarkersVisible(true) }
                 ACTION_PROFILE_CHANGED -> {
                     refreshProfileQuickButtons()
                     updateNotification()
@@ -181,6 +184,7 @@ class OverlayService : Service() {
             addAction(PointSettingsActivity.ACTION_POINT_UPDATED)
             addAction(SequencePrefs.ACTION_POINTS_CHANGED)
             addAction(ACTION_TOGGLE_MARKERS)
+            addAction(ACTION_SHOW_MARKERS)
             addAction(ACTION_PROFILE_CHANGED)
             addAction(ACTION_PROFILE_PREV)
             addAction(ACTION_PROFILE_NEXT)

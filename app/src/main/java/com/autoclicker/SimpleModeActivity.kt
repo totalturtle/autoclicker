@@ -72,6 +72,7 @@ class SimpleModeActivity : AppCompatActivity() {
         consumePickedCoord()
         updatePermissionBanner()
         setRunningState(AutoClickAccessibilityService.isRunning)
+        if (!isRunning && points.isNotEmpty()) showMarkers()
     }
 
     override fun onPause() {
@@ -219,6 +220,12 @@ class SimpleModeActivity : AppCompatActivity() {
         }
         persist()
         refreshUi()
+        showMarkers()
+    }
+
+    /** 지정한 위치를 화면에 동그라미로 보여 준다 */
+    private fun showMarkers() {
+        sendBroadcast(Intent(OverlayService.ACTION_SHOW_MARKERS).apply { setPackage(packageName) })
     }
 
     // ── 녹화 ────────────────────────────────────────────────────────────

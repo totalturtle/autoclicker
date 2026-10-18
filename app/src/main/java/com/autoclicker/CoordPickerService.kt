@@ -478,17 +478,21 @@ class CoordPickerService : Service() {
             }
         }
 
+        // 배너는 안내만 한다. 터치를 가로채면 그 영역을 지정할 수 없으므로
+        // 클릭을 받지 않고 아래 터치 레이어로 그대로 흘려보낸다(취소 버튼만 예외).
         val banner = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xDD0D1117.toInt())
-            isClickable = true
-            setPadding(dp(16), dp(48), dp(16), dp(16))
+            setBackgroundColor(0xCC0D1117.toInt())
+            isClickable = false
+            isFocusable = false
+            setPadding(dp(16), dp(36), dp(16), dp(12))
         }
         banner.addView(TextView(this).apply {
             text = instructionText
             setTextColor(Color.WHITE)
-            textSize = 17f
+            textSize = 16f
             gravity = Gravity.CENTER
+            isClickable = false
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
         ))
