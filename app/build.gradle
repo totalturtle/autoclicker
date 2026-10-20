@@ -19,7 +19,7 @@ android {
         applicationId "com.realbtob.autoclicker"
         minSdk 26
         targetSdk 36
-        versionCode 13
+        versionCode 14
         versionName "4.4.0"
     }
 
