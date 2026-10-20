@@ -396,6 +396,12 @@ class OverlayService : Service() {
      */
     private fun applyPanelMode() {
         simplePanelMode = AppPreferences.startInSimpleMode(this)
+        // 끄면 조작 버튼을 아예 띄우지 않는다. 마커와 클릭 동작은 그대로다.
+        if (!AppPreferences.isOverlayButtonEnabled(this)) {
+            overlayView.visibility = View.GONE
+            return
+        }
+        overlayView.visibility = View.VISIBLE
         val simple = overlayView.findViewById<View>(R.id.layoutSimplePanel)
         val full = listOf(
             R.id.overlayDragHandle, R.id.layoutCollapsibleTop, R.id.layoutProfileQuick,
@@ -1184,7 +1190,7 @@ class OverlayService : Service() {
             Toast.makeText(this, "저장할 포인트가 없습니다.", Toast.LENGTH_SHORT).show()
             return
         }
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadAll(this).filter { !it.simple }
         isDialogShowing = true
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
 
@@ -1238,7 +1244,7 @@ class OverlayService : Service() {
     }
 
     private fun showNewProfileNameDialog(themedCtx: Context, cfg: ClickSequenceConfig) {
-        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
+        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).filter { !it.simple }.size >= 2) {
             Toast.makeText(this, "🔒 무료 버전은 프로필을 2개까지 저장할 수 있습니다. 설정 > 프리미엄 구매에서 이용하세요.", Toast.LENGTH_LONG).show()
             isDialogShowing = false
             return
@@ -1259,7 +1265,7 @@ class OverlayService : Service() {
                     Toast.makeText(this, "이름을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 } else {
                     // 같은 이름이 이미 있으면 중복을 만들지 않고 그 프로필에 덮어쓴다.
-                    val existing = ProfileManager.loadAll(this).firstOrNull { it.name == name }
+                    val existing = ProfileManager.loadAll(this).filter { !it.simple }.firstOrNull { it.name == name }
                     MaterialAlertDialogBuilder(themedCtx)
                         .setTitle(if (existing != null) "덮어쓰기 확인" else "저장 확인")
                         .setMessage(
@@ -1293,7 +1299,7 @@ class OverlayService : Service() {
 
     private fun showOverlayLoadProfileDialog() {
         if (isDialogShowing) return
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadAll(this).filter { !it.simple }
         if (profiles.isEmpty()) {
             Toast.makeText(this, "저장된 프로필이 없습니다.", Toast.LENGTH_SHORT).show()
             return
@@ -1358,7 +1364,7 @@ class OverlayService : Service() {
     private fun refreshProfileQuickButtons() {
         val container = overlayView.findViewById<LinearLayout>(R.id.layoutProfileQuick) ?: return
         container.removeAllViews()
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadAll(this).filter { !it.simple }
         if (profiles.isEmpty()) {
             if (panelState != 0) container.visibility = View.GONE
             return
@@ -1436,7 +1442,7 @@ class OverlayService : Service() {
     }
 
     private fun switchProfile(direction: Int) {
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadAll(this).filter { !it.simple }
         if (profiles.isEmpty()) return
         val currentIdx = profiles.indexOfFirst { it.id == activeProfileId }
         val nextIdx = if (currentIdx < 0) {
@@ -1448,7 +1454,7 @@ class OverlayService : Service() {
     }
 
     private fun updateNotification() {
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadAll(this).filter { !it.simple }
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("AutoClicker")
             .setSmallIcon(android.R.drawable.ic_media_play)

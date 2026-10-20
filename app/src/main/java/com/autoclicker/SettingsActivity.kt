@@ -25,6 +25,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupThemeSelector()
         setupStartScreenToggle()
+        setupOverlayButtonToggle()
         setupAutoLinkToggle()
         setupInfoSection()
         setupPremiumSection()
@@ -43,6 +44,24 @@ class SettingsActivity : AppCompatActivity() {
             Toast.makeText(
                 this,
                 if (isChecked) R.string.simple_switched_to_simple else R.string.simple_switched_to_advanced,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun setupOverlayButtonToggle() {
+        binding.switchOverlayButton.isChecked = AppPreferences.isOverlayButtonEnabled(this)
+        binding.switchOverlayButton.setOnCheckedChangeListener { _, isChecked ->
+            AppPreferences.setOverlayButtonEnabled(this, isChecked)
+            // 서비스에 바로 반영
+            runCatching {
+                androidx.core.content.ContextCompat.startForegroundService(
+                    this, Intent(this, OverlayService::class.java)
+                )
+            }
+            Toast.makeText(
+                this,
+                if (isChecked) R.string.toast_overlay_button_on else R.string.toast_overlay_button_off,
                 Toast.LENGTH_SHORT
             ).show()
         }

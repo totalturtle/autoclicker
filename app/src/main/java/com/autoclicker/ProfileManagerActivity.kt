@@ -175,7 +175,8 @@ class ProfileManagerActivity : AppCompatActivity() {
 
     private fun refreshProfiles() {
         profiles.clear()
-        profiles.addAll(ProfileManager.loadAll(this))
+        // 간단 모드에서 저장한 설정은 간단 모드에서만 다룬다
+        profiles.addAll(ProfileManager.loadAll(this).filter { !it.simple })
         adapter.notifyDataSetChanged()
         binding.tvEmptyProfiles.visibility =
             if (profiles.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE

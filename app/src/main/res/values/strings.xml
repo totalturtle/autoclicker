@@ -127,6 +127,11 @@
     <string name="simple_loaded_fmt">\'%s\' 불러왔습니다.</string>
     <string name="simple_clear_on_switch">간단 모드에서 만든 위치는 지웠습니다.</string>
     <string name="premium_profile_limit">무료 버전은 설정을 2개까지 저장할 수 있습니다. 설정에서 프리미엄을 구매하면 무제한입니다.</string>
+    <string name="section_overlay_button">화면 위 조작 버튼</string>
+    <string name="hint_overlay_button">실행 중 다른 앱 위에 떠서 멈출 수 있는 버튼입니다. 끄면 버튼이 사라지고, 볼륨 키나 앱 화면에서 멈출 수 있습니다.</string>
+    <string name="label_overlay_button_toggle">화면 위에 조작 버튼 표시</string>
+    <string name="toast_overlay_button_on">화면 위 조작 버튼을 켰습니다.</string>
+    <string name="toast_overlay_button_off">조작 버튼을 껐습니다. 볼륨 키나 앱 화면에서 멈출 수 있습니다.</string>
     <string name="toast_profile_loaded">\'%s\' 프로필이 로드되었습니다.</string>
     <string name="toast_app_linked">\'%s\' 앱에 연동됨</string>
     <string name="toast_app_link_removed">앱 연동이 해제됨</string>

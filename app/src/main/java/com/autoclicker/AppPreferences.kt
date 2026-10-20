@@ -10,6 +10,17 @@ object AppPreferences {
     private const val KEY_AUTO_LINK = "auto_link_enabled"
     private const val KEY_SIMPLE_START = "simple_mode_start"
     private const val KEY_SIMPLE_MULTI = "simple_mode_multi"
+    private const val KEY_OVERLAY_BUTTON = "overlay_button_enabled"
+
+    /** 실행 중 화면에 떠 있는 조작 버튼을 보여 줄지 (기본 켜짐) */
+    fun isOverlayButtonEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_OVERLAY_BUTTON, true)
+
+    fun setOverlayButtonEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_OVERLAY_BUTTON, enabled).apply()
+    }
 
     /**
      * 앱을 열 때 간단 모드로 시작할지.

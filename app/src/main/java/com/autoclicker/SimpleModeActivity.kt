@@ -240,7 +240,7 @@ class SimpleModeActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.simple_need_point, Toast.LENGTH_SHORT).show()
             return
         }
-        val all = ProfileManager.loadAll(this)
+        val all = ProfileManager.loadSimple(this)
         val current = all.firstOrNull { it.id == ProfileManager.getActiveId(this) }
         val input = android.widget.EditText(this).apply {
             setHint(R.string.hint_profile_name)
@@ -270,7 +270,7 @@ class SimpleModeActivity : AppCompatActivity() {
             .setMessage(getString(R.string.dialog_overwrite_profile_msg, target.name))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.btn_save) { _, _ ->
-                ProfileManager.save(this, target.copy(config = buildConfig()))
+                ProfileManager.save(this, target.copy(config = buildConfig(), simple = true))
                 ProfileManager.setActiveId(this, target.id)
                 ProfileManager.notifyChanged(this)
                 Toast.makeText(this, getString(R.string.toast_profile_overwritten, target.name), Toast.LENGTH_SHORT).show()
@@ -279,11 +279,11 @@ class SimpleModeActivity : AppCompatActivity() {
     }
 
     private fun saveAsNew(name: String) {
-        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
+        if (!PremiumManager.isPremium && ProfileManager.loadSimple(this).size >= 2) {
             Toast.makeText(this, R.string.premium_profile_limit, Toast.LENGTH_LONG).show()
             return
         }
-        val created = Profile(name = name, config = buildConfig())
+        val created = Profile(name = name, config = buildConfig(), simple = true)
         ProfileManager.save(this, created)
         ProfileManager.setActiveId(this, created.id)
         ProfileManager.notifyChanged(this)
@@ -292,7 +292,7 @@ class SimpleModeActivity : AppCompatActivity() {
 
     /** 저장해 둔 설정을 골라 화면에 채운다. */
     private fun showLoadDialog() {
-        val profiles = ProfileManager.loadAll(this)
+        val profiles = ProfileManager.loadSimple(this)
         if (profiles.isEmpty()) {
             Toast.makeText(this, R.string.simple_load_empty, Toast.LENGTH_SHORT).show()
             return

@@ -10,7 +10,9 @@ data class Profile(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     val config: ClickSequenceConfig,
-    val linkedAppPackage: String = ""
+    val linkedAppPackage: String = "",
+    /** 간단 모드에서 저장한 설정 — 간단 모드 목록에만 보인다 */
+    val simple: Boolean = false
 )
 
 object ProfileManager {
@@ -64,7 +66,8 @@ object ProfileManager {
                             id = o.optString("id", UUID.randomUUID().toString()),
                             name = o.optString("name", "Profile"),
                             config = cfg,
-                            linkedAppPackage = o.optString("app", "")
+                            linkedAppPackage = o.optString("app", ""),
+                            simple = o.optBoolean("simple", false)
                         )
                     )
                 }
@@ -88,6 +91,7 @@ object ProfileManager {
                 put("name", p.name)
                 put("config", p.config.toJsonString())
                 put("app", p.linkedAppPackage)
+                if (p.simple) put("simple", true)
             })
         }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
@@ -110,11 +114,15 @@ object ProfileManager {
     fun findByApp(context: Context, packageName: String): Profile? =
         loadAll(context).firstOrNull { it.linkedAppPackage == packageName }
 
+    /** 간단 모드에서 저장한 것만 */
+    fun loadSimple(context: Context): List<Profile> = loadAll(context).filter { it.simple }
+
     fun toExportJson(profile: Profile): String = JSONObject().apply {
         put("id", profile.id)
         put("name", profile.name)
         put("config", profile.config.toJsonString())
         put("app", profile.linkedAppPackage)
+        if (profile.simple) put("simple", true)
     }.toString(2)
 
     fun fromImportJson(json: String): Profile? = runCatching {
@@ -124,7 +132,8 @@ object ProfileManager {
             id = UUID.randomUUID().toString(),
             name = o.optString("name", "Imported"),
             config = cfg,
-            linkedAppPackage = o.optString("app", "")
+            linkedAppPackage = o.optString("app", ""),
+            simple = o.optBoolean("simple", false)
         )
     }.getOrNull()
 }
