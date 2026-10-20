@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.realbtob.autoclicker.databinding.ActivitySimpleModeBinding
 
 /**
@@ -106,16 +107,12 @@ class SimpleModeActivity : AppCompatActivity() {
         }
         binding.etRepeatCount.setOnClickListener { setRepeatForever(false) }
 
+        binding.btnSimpleSave.setOnClickListener { showSaveDialog() }
+        binding.btnSimpleLoad.setOnClickListener { showLoadDialog() }
         binding.btnSimpleRecord.setOnClickListener { startRecording() }
         binding.btnSimpleStart.setOnClickListener { if (isRunning) stopClicking() else startClicking() }
 
-        binding.btnAdvancedMode.setOnClickListener {
-            persist()
-            AppPreferences.setSimpleModeStart(this, false)
-            Toast.makeText(this, R.string.simple_switched_to_advanced, Toast.LENGTH_SHORT).show()
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-        }
+        binding.btnAdvancedMode.setOnClickListener { goAdvanced() }
         binding.btnSimpleSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
@@ -221,6 +218,111 @@ class SimpleModeActivity : AppCompatActivity() {
         persist()
         refreshUi()
         showMarkers()
+    }
+
+    /**
+     * 모든 기능 화면으로 넘어간다.
+     * 간단 모드에서 만든 위치는 지우고 간다 — 저장해 둔 설정은 그대로 남는다.
+     */
+    private fun goAdvanced() {
+        points.clear()
+        SequencePrefs.save(this, ClickSequenceConfig(emptyList(), readIntervalMs().coerceAtLeast(100L), 0))
+        showMarkers()
+        AppPreferences.setSimpleModeStart(this, false)
+        Toast.makeText(this, R.string.simple_clear_on_switch, Toast.LENGTH_SHORT).show()
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
+    }
+
+    /** 지금 설정을 이름 붙여 저장한다. 같은 이름이면 덮어쓸지 묻는다. */
+    private fun showSaveDialog() {
+        if (points.isEmpty()) {
+            Toast.makeText(this, R.string.simple_need_point, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val all = ProfileManager.loadAll(this)
+        val current = all.firstOrNull { it.id == ProfileManager.getActiveId(this) }
+        val input = android.widget.EditText(this).apply {
+            setHint(R.string.hint_profile_name)
+            setSingleLine()
+            setPadding(48, 32, 48, 16)
+            current?.let { setText(it.name) }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.simple_save_title)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_save) { _, _ ->
+                val name = input.text?.toString()?.trim()
+                if (name.isNullOrEmpty()) {
+                    Toast.makeText(this, R.string.toast_enter_name, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val existing = all.firstOrNull { it.name == name }
+                if (existing != null) confirmOverwrite(existing) else saveAsNew(name)
+            }
+            .show()
+    }
+
+    private fun confirmOverwrite(target: Profile) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_overwrite_profile_title)
+            .setMessage(getString(R.string.dialog_overwrite_profile_msg, target.name))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_save) { _, _ ->
+                ProfileManager.save(this, target.copy(config = buildConfig()))
+                ProfileManager.setActiveId(this, target.id)
+                ProfileManager.notifyChanged(this)
+                Toast.makeText(this, getString(R.string.toast_profile_overwritten, target.name), Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun saveAsNew(name: String) {
+        if (!PremiumManager.isPremium && ProfileManager.loadAll(this).size >= 2) {
+            Toast.makeText(this, R.string.premium_profile_limit, Toast.LENGTH_LONG).show()
+            return
+        }
+        val created = Profile(name = name, config = buildConfig())
+        ProfileManager.save(this, created)
+        ProfileManager.setActiveId(this, created.id)
+        ProfileManager.notifyChanged(this)
+        Toast.makeText(this, getString(R.string.toast_profile_saved, name), Toast.LENGTH_SHORT).show()
+    }
+
+    /** 저장해 둔 설정을 골라 화면에 채운다. */
+    private fun showLoadDialog() {
+        val profiles = ProfileManager.loadAll(this)
+        if (profiles.isEmpty()) {
+            Toast.makeText(this, R.string.simple_load_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = profiles.map { it.name }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.simple_load_title)
+            .setItems(names) { _, which ->
+                val profile = profiles[which]
+                applyConfig(profile.config)
+                SequencePrefs.save(this, profile.config)
+                ProfileManager.setActiveId(this, profile.id)
+                AutoClickAccessibilityService.onUserLoadedProfile(profile)
+                showMarkers()
+                Toast.makeText(this, getString(R.string.simple_loaded_fmt, profile.name), Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** 불러온 설정을 화면에 반영한다. */
+    private fun applyConfig(cfg: ClickSequenceConfig) {
+        points.clear()
+        points.addAll(cfg.points)
+        DelayUnit.fill(binding.etSimpleInterval, binding.spSimpleUnit, cfg.globalDelayMs)
+        repeatForever = cfg.repeatCount <= 0
+        if (!repeatForever) binding.etRepeatCount.setText(cfg.repeatCount.toString())
+        multiMode = points.size > 1
+        AppPreferences.setSimpleMulti(this, multiMode)
+        refreshUi()
     }
 
     /** 지정한 위치를 화면에 동그라미로 보여 준다 */

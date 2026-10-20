@@ -289,6 +289,36 @@
         android:paddingEnd="20dp"
         android:paddingBottom="24dp">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:id="@+id/btnSimpleSave"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_simple_outline"
+                android:gravity="center"
+                android:text="@string/simple_save"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/btnSimpleLoad"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_simple_outline"
+                android:gravity="center"
+                android:text="@string/simple_load"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/btnSimpleRecord"
             android:layout_width="match_parent"
