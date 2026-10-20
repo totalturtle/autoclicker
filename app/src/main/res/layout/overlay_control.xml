@@ -191,24 +191,24 @@
     <!-- 간단 모드 전용 패널 -->
     <LinearLayout
         android:id="@+id/layoutSimplePanel"
-        android:layout_width="76dp"
+        android:layout_width="56dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         android:background="@drawable/bg_simple_overlay"
-        android:elevation="8dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="12dp"
+        android:elevation="6dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="6dp"
         android:visibility="gone">
 
         <TextView
             android:id="@+id/tvSimpleHandle"
             android:layout_width="match_parent"
-            android:layout_height="26dp"
+            android:layout_height="20dp"
             android:gravity="center"
             android:text="· · ·"
             android:textColor="@color/text_hint"
-            android:textSize="13sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/tvSimpleOverlayCount"
@@ -216,38 +216,54 @@
             android:layout_height="wrap_content"
             android:text="0"
             android:textColor="@color/text_primary"
-            android:textSize="21sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvSimpleOverlayCountLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:text="@string/simple_overlay_count"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:textSize="9sp" />
 
         <Button
             android:id="@+id/btnSimpleOverlayToggle"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:background="@drawable/bg_simple_circle_stop"
             android:padding="0dp"
             android:stateListAnimator="@null"
             android:text="■"
             android:textColor="@color/simple_on_accent"
-            android:textSize="18sp" />
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/tvSimpleOverlayLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="3dp"
             android:text="@string/simple_overlay_stop"
             android:textColor="@color/simple_danger"
-            android:textSize="12sp"
+            android:textSize="10sp"
             android:textStyle="bold" />
+
+        <View
+            android:id="@+id/dividerSimpleOverlay"
+            android:layout_width="28dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:background="@color/simple_outline" />
+
+        <TextView
+            android:id="@+id/btnSimpleOverlayClose"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center"
+            android:text="@string/simple_overlay_close_short"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
 
     </LinearLayout>
 

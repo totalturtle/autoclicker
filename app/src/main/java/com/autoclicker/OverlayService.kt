@@ -301,11 +301,13 @@ class OverlayService : Service() {
             clearMarkers()
         }
 
-        overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener {
-            if (isRunning) {
-                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
-            }
-            stopSelf()
+        overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener { closeOverlay() }
+
+        // 간단 모드: 오버레이를 여기서 바로 숨긴다 (앱으로 돌아갈 필요 없이)
+        overlayView.findViewById<TextView>(R.id.btnSimpleOverlayClose).setOnClickListener {
+            AppPreferences.setOverlayButtonEnabled(this, false)
+            Toast.makeText(this, R.string.toast_overlay_closed, Toast.LENGTH_LONG).show()
+            closeOverlay()
         }
     }
 
@@ -364,6 +366,14 @@ class OverlayService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
+    }
+
+    /** 오버레이를 닫는다. 실행 중이면 먼저 멈춘다. */
+    private fun closeOverlay() {
+        if (isRunning) {
+            sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+        }
+        stopSelf()
     }
 
     /** 시작/정지 토글 — 기본 패널과 간단 모드 패널이 같이 쓴다 */
@@ -430,6 +440,8 @@ class OverlayService : Service() {
         overlayView.findViewById<View>(R.id.tvSimpleOverlayCount)?.visibility = vis
         overlayView.findViewById<View>(R.id.tvSimpleOverlayCountLabel)?.visibility = vis
         overlayView.findViewById<View>(R.id.tvSimpleOverlayLabel)?.visibility = vis
+        overlayView.findViewById<View>(R.id.dividerSimpleOverlay)?.visibility = vis
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayClose)?.visibility = vis
     }
 
     private fun setRunningState(running: Boolean) {

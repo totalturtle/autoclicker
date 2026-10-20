@@ -118,6 +118,9 @@
     <string name="simple_overlay_count">번 누름</string>
     <string name="simple_overlay_stop">멈추기</string>
     <string name="simple_overlay_start">시작</string>
+    <string name="simple_overlay_close">✕ 버튼 숨기기</string>
+    <string name="simple_overlay_close_short">✕ 숨기기</string>
+    <string name="toast_overlay_closed">화면 위 버튼을 숨겼습니다. 설정 → 화면 위 조작 버튼에서 다시 켤 수 있습니다.</string>
     <string name="go_simple_mode">‹ 간단 모드</string>
     <string name="simple_save">저장</string>
     <string name="simple_load">불러오기</string>
