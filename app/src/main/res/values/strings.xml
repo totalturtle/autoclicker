@@ -87,9 +87,9 @@
     <string name="simple_mode_single">한 곳 반복</string>
     <string name="simple_mode_multi">여러 곳 순서대로</string>
     <string name="simple_pick_title">누를 위치를 지정하세요</string>
-    <string name="simple_pick_hint">화면이 뜨면 원하는 곳을 한 번 터치</string>
+    <string name="simple_pick_hint">누르면 앱이 내려갑니다. 쓰려는 앱을 열고 + 버튼으로 지정하세요</string>
     <string name="simple_picked_fmt">가로 %1$d · 세로 %2$d</string>
-    <string name="simple_picked_hint">다시 누르면 위치를 바꿉니다</string>
+    <string name="simple_picked_hint">바꾸려면 다시 누른 뒤 + 버튼으로 지정하세요</string>
     <string name="simple_add_point">+ 위치 추가</string>
     <string name="simple_remove_point">위치 삭제</string>
     <string name="simple_interval">누르는 간격</string>
@@ -118,9 +118,11 @@
     <string name="simple_overlay_count">번 누름</string>
     <string name="simple_overlay_stop">멈추기</string>
     <string name="simple_overlay_start">시작</string>
+    <string name="simple_pick_over_app">원하는 앱을 연 다음, 화면 위 + 버튼을 눌러 위치를 지정하세요.</string>
+    <string name="simple_point_added_fmt">%d번 위치를 추가했습니다.</string>
     <string name="simple_overlay_close">✕ 버튼 숨기기</string>
-    <string name="simple_overlay_close_short">✕ 숨기기</string>
-    <string name="toast_overlay_closed">화면 위 버튼을 숨겼습니다. 설정 → 화면 위 조작 버튼에서 다시 켤 수 있습니다.</string>
+    <string name="simple_overlay_close_short">✕ 닫기</string>
+    <string name="toast_overlay_closed">화면 위 버튼을 닫았습니다. 앱을 다시 열면 나타납니다.</string>
     <string name="go_simple_mode">‹ 간단 모드</string>
     <string name="simple_save">저장</string>
     <string name="simple_load">불러오기</string>

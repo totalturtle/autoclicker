@@ -303,10 +303,22 @@ class OverlayService : Service() {
 
         overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener { closeOverlay() }
 
-        // 간단 모드: 오버레이를 여기서 바로 숨긴다 (앱으로 돌아갈 필요 없이)
+        // 간단 모드: 쓰고 있는 앱 위에서 바로 위치 추가
+        overlayView.findViewById<Button>(R.id.btnSimpleOverlayAdd).setOnClickListener {
+            val cfg = SequencePrefs.load(this)
+            val count = cfg?.points?.size ?: 0
+            if (!PremiumManager.isPremium && count >= PremiumManager.FREE_POINT_LIMIT) {
+                Toast.makeText(this, R.string.premium_point_limit, Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            startService(Intent(this, CoordPickerService::class.java).apply {
+                putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_SIMPLE_ADD)
+            })
+        }
+
+        // 간단 모드: 이번만 닫는다. 앱을 다시 열면 나타난다(설정 스위치는 건드리지 않는다).
         overlayView.findViewById<TextView>(R.id.btnSimpleOverlayClose).setOnClickListener {
-            AppPreferences.setOverlayButtonEnabled(this, false)
-            Toast.makeText(this, R.string.toast_overlay_closed, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.toast_overlay_closed, Toast.LENGTH_SHORT).show()
             closeOverlay()
         }
     }
@@ -441,6 +453,7 @@ class OverlayService : Service() {
         overlayView.findViewById<View>(R.id.tvSimpleOverlayCountLabel)?.visibility = vis
         overlayView.findViewById<View>(R.id.tvSimpleOverlayLabel)?.visibility = vis
         overlayView.findViewById<View>(R.id.dividerSimpleOverlay)?.visibility = vis
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayClose)?.visibility = vis
     }
 
@@ -467,6 +480,8 @@ class OverlayService : Service() {
             )
         }
         if (!running) overlayView.findViewById<TextView>(R.id.tvSimpleOverlayCount)?.text = "0"
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility =
+            if (running || simpleCollapsed) View.GONE else View.VISIBLE
         // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
         val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }

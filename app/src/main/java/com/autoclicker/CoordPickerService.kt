@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -35,6 +36,8 @@ class CoordPickerService : Service() {
         const val TARGET_TRIGGER       = "trigger"
         const val TARGET_OVERLAY_ADD   = "overlay_add"
         const val TARGET_SIMPLE        = "simple"
+        /** 간단 모드: 쓰고 있는 앱 위에서 바로 위치를 추가한다 */
+        const val TARGET_SIMPLE_ADD    = "simple_add"
         const val TARGET_COLOR           = "color"
         const val TARGET_OVERLAY_COLOR   = "overlay_color"
         const val TARGET_REGION_CAPTURE  = "region_capture"
@@ -462,6 +465,7 @@ class CoordPickerService : Service() {
 
         val instructionText = when (target) {
             TARGET_OVERLAY_ADD -> "클릭할 위치를 터치하세요\n(포인트로 즉시 추가됩니다)"
+            TARGET_SIMPLE_ADD  -> "누를 위치를 터치하세요\n(여기에 자동 클릭이 들어갑니다)"
             TARGET_END         -> "스와이프 끝 좌표를 터치하세요"
             TARGET_TRIGGER     -> "트리거 확인 좌표를 터치하세요"
             else               -> getString(R.string.coord_picker_instruction)
@@ -517,6 +521,18 @@ class CoordPickerService : Service() {
     private fun deliver(x: Int, y: Int, target: String) {
         dismiss()
         when (target) {
+            TARGET_SIMPLE_ADD -> {
+                // 앱으로 돌아가지 않고 그 자리에서 포인트를 추가한다
+                val cfg = SequencePrefs.load(this) ?: ClickSequenceConfig(emptyList(), 1000L, 0)
+                val updated = cfg.copy(points = cfg.points + ClickPoint(x = x, y = y))
+                SequencePrefs.save(this, updated)
+                sendBroadcast(Intent(OverlayService.ACTION_SHOW_MARKERS).apply { setPackage(packageName) })
+                Toast.makeText(
+                    this,
+                    getString(R.string.simple_point_added_fmt, updated.points.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
             TARGET_SIMPLE -> {
                 SimpleModeActivity.pickedCoord = x to y
                 startActivity(Intent(this, SimpleModeActivity::class.java).apply {

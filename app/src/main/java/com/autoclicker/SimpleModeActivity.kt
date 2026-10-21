@@ -196,14 +196,17 @@ class SimpleModeActivity : AppCompatActivity() {
 
     // ── 좌표 지정 ────────────────────────────────────────────────────────
 
+    /**
+     * 위치 지정은 "쓰려는 앱 위에서" 해야 정확하다.
+     * 그래서 이 앱을 내리고, 화면 위에 남는 + 버튼으로 지정하도록 안내한다.
+     */
     private fun pickCoordinate() {
         if (!Settings.canDrawOverlays(this)) {
             openMissingPermission()
             return
         }
-        startService(Intent(this, CoordPickerService::class.java).apply {
-            putExtra(CoordPickerService.EXTRA_PICK_TARGET, CoordPickerService.TARGET_SIMPLE)
-        })
+        ensureOverlayServiceRunning()
+        Toast.makeText(this, R.string.simple_pick_over_app, Toast.LENGTH_LONG).show()
         moveTaskToBack(true)
     }
 
@@ -428,8 +431,8 @@ class SimpleModeActivity : AppCompatActivity() {
         repeatDurationMs = 0L
     )
 
+    /** 위치를 모두 지운 경우에도 저장해야 화면의 마커가 같이 사라진다 */
     private fun persist() {
-        if (points.isEmpty()) return
         SequencePrefs.save(this, buildConfig())
     }
 
@@ -525,6 +528,7 @@ class SimpleModeActivity : AppCompatActivity() {
                 points.removeAt(index)
                 persist()
                 refreshUi()
+                showMarkers()
             }
         }
     }

@@ -229,6 +229,19 @@
             android:textSize="9sp" />
 
         <Button
+            android:id="@+id/btnSimpleOverlayAdd"
+            android:layout_width="42dp"
+            android:layout_height="34dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_simple_soft"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="+"
+            android:textColor="@color/simple_accent"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <Button
             android:id="@+id/btnSimpleOverlayToggle"
             android:layout_width="42dp"
             android:layout_height="42dp"
