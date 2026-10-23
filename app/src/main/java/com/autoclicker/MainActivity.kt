@@ -412,10 +412,8 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
-        binding.btnRecordPoints.setOnClickListener {
-            if (!PremiumManager.isPremium) { showPremiumDialog(); return@setOnClickListener }
-            startRecording()
-        }
+        // 녹화는 간단 모드와 같이 무료로 쓸 수 있다 (저장되는 포인트 수만 무료 한도를 따른다)
+        binding.btnRecordPoints.setOnClickListener { startRecording() }
         binding.btnAddPoint.setOnClickListener { addPointDirect() }
 
         var pointListCollapsed = false
@@ -571,6 +569,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startRecording() {
+        if (!PremiumManager.isPremium) {
+            Toast.makeText(
+                this,
+                getString(R.string.toast_record_free_notice_fmt, PremiumManager.FREE_POINT_LIMIT),
+                Toast.LENGTH_LONG
+            ).show()
+        }
         startService(Intent(this, RecordingService::class.java))
         moveTaskToBack(true)
     }
@@ -592,10 +597,21 @@ class MainActivity : AppCompatActivity() {
             )
         }
         if (newPoints.isEmpty()) return
-        points.addAll(newPoints)
+        val room = if (PremiumManager.isPremium) newPoints.size
+                   else (PremiumManager.FREE_POINT_LIMIT - points.size).coerceAtLeast(0)
+        val accepted = newPoints.take(room)
+        points.addAll(accepted)
         pointAdapter.notifyDataSetChanged()
         persistSequence()
-        Toast.makeText(this, "${newPoints.size}개 포인트 녹화 완료", Toast.LENGTH_SHORT).show()
+        if (accepted.size < newPoints.size) {
+            Toast.makeText(
+                this,
+                getString(R.string.toast_record_limited_fmt, accepted.size, PremiumManager.FREE_POINT_LIMIT),
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, "${accepted.size}개 포인트 녹화 완료", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun addPointDirect() {

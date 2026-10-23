@@ -340,6 +340,13 @@ class SimpleModeActivity : AppCompatActivity() {
             openMissingPermission()
             return
         }
+        if (!PremiumManager.isPremium) {
+            Toast.makeText(
+                this,
+                getString(R.string.toast_record_free_notice_fmt, PremiumManager.FREE_POINT_LIMIT),
+                Toast.LENGTH_LONG
+            ).show()
+        }
         startService(Intent(this, RecordingService::class.java))
         moveTaskToBack(true)
     }
@@ -361,12 +368,23 @@ class SimpleModeActivity : AppCompatActivity() {
             )
         }
         if (recorded.isEmpty()) return
+        val accepted = if (PremiumManager.isPremium) recorded
+                       else recorded.take(PremiumManager.FREE_POINT_LIMIT)
         points.clear()
-        points.addAll(recorded)
+        points.addAll(accepted)
         if (points.size > 1 && !multiMode) setMultiMode(true)
         persist()
         refreshUi()
-        Toast.makeText(this, "${recorded.size}개 동작을 녹화했습니다.", Toast.LENGTH_SHORT).show()
+        showMarkers()
+        if (accepted.size < recorded.size) {
+            Toast.makeText(
+                this,
+                getString(R.string.toast_record_limited_fmt, accepted.size, PremiumManager.FREE_POINT_LIMIT),
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, "${accepted.size}개 동작을 녹화했습니다.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ── 시작 / 정지 ──────────────────────────────────────────────────────
