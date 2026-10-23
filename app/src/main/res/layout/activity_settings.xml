@@ -40,7 +40,7 @@
                     android:id="@+id/tvPremiumDesc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="스와이프 · 색상 트리거 · 프로필 · 녹화 · 오차 설정\n포인트 무제한 등 모든 기능 잠금 해제"
+                    android:text="스와이프 · 색상 트리거 · 프로필 · 오차 설정\n포인트 무제한 등 모든 기능 잠금 해제"
                     android:textSize="13sp"
                     android:textColor="#C7C9FF"
                     android:layout_marginBottom="16dp" />

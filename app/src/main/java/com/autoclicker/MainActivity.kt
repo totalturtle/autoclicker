@@ -541,7 +541,6 @@ class MainActivity : AppCompatActivity() {
             "✅ 색상 트리거\n" +
             "✅ 포인트 무제한 (무료: 3개)\n" +
             "✅ 프로필 저장/불러오기\n" +
-            "✅ 터치 녹화\n" +
             "✅ 딜레이/픽셀 오차 설정\n\n"
 
         fun buildAndShow(priceLabel: String) {
