@@ -303,6 +303,11 @@ class OverlayService : Service() {
 
         overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener { closeOverlay() }
 
+        // 쓰고 있는 앱 위에서 바로 녹화 시작
+        val startRecord = View.OnClickListener { startRecordingFromOverlay() }
+        overlayView.findViewById<Button>(R.id.btnSimpleOverlayRecord).setOnClickListener(startRecord)
+        overlayView.findViewById<Button>(R.id.btnOverlayRecord).setOnClickListener(startRecord)
+
         // 간단 모드: 쓰고 있는 앱 위에서 바로 위치 추가
         overlayView.findViewById<Button>(R.id.btnSimpleOverlayAdd).setOnClickListener {
             val cfg = SequencePrefs.load(this)
@@ -378,6 +383,51 @@ class OverlayService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
+    }
+
+    /**
+     * 오버레이에서 녹화를 시작한다.
+     * 쓰려는 앱을 띄워 둔 상태에서 눌러야 그 화면의 동작을 녹화할 수 있다.
+     */
+    private fun startRecordingFromOverlay() {
+        if (!FreePass.canRecord(this)) {
+            showRecordPassDialog()
+            return
+        }
+        if (isRunning) {
+            Toast.makeText(this, R.string.toast_stop_before_record, Toast.LENGTH_SHORT).show()
+            return
+        }
+        startService(Intent(this, RecordingService::class.java))
+    }
+
+    /** 녹화 이용권 안내 — 광고는 앱 화면에서 재생한다 */
+    private fun showRecordPassDialog() {
+        if (isDialogShowing) return
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val builder = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle(R.string.dialog_record_title)
+            .setMessage(R.string.dialog_record_msg)
+            .setNegativeButton("취소", null)
+            .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra("show_premium_dialog", true)
+                })
+            }
+        if (AdManager.isRewardAvailable) {
+            builder.setNeutralButton(R.string.btn_watch_ad) { _, _ ->
+                startActivity(Intent(this, SimpleModeActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(SimpleModeActivity.EXTRA_REQUEST_PASS, FreePass.RECORDING)
+                })
+            }
+        }
+        val dialog = builder.create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
     }
 
     /** 프리미엄 전용 기능 안내 — 오버레이 위에 띄우고, 구매는 앱 화면에서 진행한다 */
@@ -505,6 +555,7 @@ class OverlayService : Service() {
         overlayView.findViewById<View>(R.id.tvSimpleOverlayLabel)?.visibility = vis
         overlayView.findViewById<View>(R.id.dividerSimpleOverlay)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility = vis
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayRecord)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayClose)?.visibility = vis
     }
 
@@ -531,8 +582,9 @@ class OverlayService : Service() {
             )
         }
         if (!running) overlayView.findViewById<TextView>(R.id.tvSimpleOverlayCount)?.text = "0"
-        overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility =
-            if (running || simpleCollapsed) View.GONE else View.VISIBLE
+        val editable = if (running || simpleCollapsed) View.GONE else View.VISIBLE
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility = editable
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayRecord)?.visibility = editable
         // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
         val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }

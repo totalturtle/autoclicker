@@ -681,14 +681,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startRecording() {
-        if (!PremiumManager.isPremium) {
-            Toast.makeText(
-                this,
-                getString(R.string.toast_record_free_notice_fmt, FreePass.pointLimit(this)),
-                Toast.LENGTH_LONG
-            ).show()
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.toast_need_overlay_permission, Toast.LENGTH_LONG).show()
+            return
         }
-        startService(Intent(this, RecordingService::class.java))
+        // 녹화는 쓰려는 앱 위에서 시작해야 한다. 앱을 내리고 오버레이의 ● 로 시작하게 안내한다.
+        ensureOverlayServiceRunning()
+        Toast.makeText(this, R.string.simple_record_over_app, Toast.LENGTH_LONG).show()
         moveTaskToBack(true)
     }
 

@@ -100,6 +100,17 @@
             android:visibility="gone" />
 
         <!-- 포인트 삭제 -->
+        <Button
+            android:id="@+id/btnOverlayRecord"
+            android:layout_width="44dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_edit_mode_off"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="● 녹화"
+            android:textColor="#E05252"
+            android:textSize="9sp" />
+
         <ImageButton
             android:id="@+id/btnOverlayRemovePoint"
             android:layout_width="44dp"
@@ -227,6 +238,18 @@
             android:text="@string/simple_overlay_count"
             android:textColor="@color/text_secondary"
             android:textSize="9sp" />
+
+        <Button
+            android:id="@+id/btnSimpleOverlayRecord"
+            android:layout_width="42dp"
+            android:layout_height="34dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_simple_soft"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="●"
+            android:textColor="@color/simple_danger"
+            android:textSize="14sp" />
 
         <Button
             android:id="@+id/btnSimpleOverlayAdd"

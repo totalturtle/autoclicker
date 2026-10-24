@@ -479,14 +479,9 @@ class SimpleModeActivity : AppCompatActivity() {
             openMissingPermission()
             return
         }
-        if (!PremiumManager.isPremium) {
-            Toast.makeText(
-                this,
-                getString(R.string.toast_record_free_notice_fmt, PremiumManager.FREE_POINT_LIMIT),
-                Toast.LENGTH_LONG
-            ).show()
-        }
-        startService(Intent(this, RecordingService::class.java))
+        // 녹화도 쓰려는 앱 위에서 해야 한다. 앱을 내리고 오버레이의 ● 로 시작하게 안내한다.
+        ensureOverlayServiceRunning()
+        Toast.makeText(this, R.string.simple_record_over_app, Toast.LENGTH_LONG).show()
         moveTaskToBack(true)
     }
 

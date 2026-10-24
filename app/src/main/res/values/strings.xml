@@ -146,6 +146,9 @@
     <string name="dialog_premium_title">🔒 프리미엄 기능</string>
     <string name="premium_quick_switch">프로필 퀵 전환은 프리미엄 기능입니다.\n탭 한 번으로 저장해 둔 프로필을 바꿔 가며 실행할 수 있습니다.</string>
     <string name="premium_generic">이 기능은 프리미엄 버전에서 사용할 수 있습니다.</string>
+    <string name="toast_stop_before_record">먼저 자동 클릭을 멈춘 뒤 녹화해 주세요.</string>
+    <string name="simple_record_over_app">쓰려는 앱을 연 다음, 화면 위 ● 버튼을 눌러 녹화를 시작하세요.</string>
+    <string name="toast_need_overlay_permission">다른 앱 위에 표시 권한이 필요합니다.</string>
     <string name="premium_profile_count">무료 버전은 프로필을 2개까지 저장할 수 있습니다.\n프리미엄을 구매하면 제한 없이 저장할 수 있습니다.</string>
     <string name="simple_overlay_close">✕ 버튼 숨기기</string>
     <string name="simple_overlay_close_short">✕ 닫기</string>
