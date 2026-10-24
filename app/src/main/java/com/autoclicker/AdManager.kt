@@ -22,7 +22,7 @@ object AdManager {
      * 비어 있으면 "광고 보고 열기" 버튼을 띄우지 않는다(테스트 ID를 출시에 쓰면 정책 위반).
      */
     private const val REWARD_UNIT_ID_TEST = "ca-app-pub-3940256099942544/5224354917"
-    private const val REWARD_UNIT_ID_RELEASE = ""
+    private const val REWARD_UNIT_ID_RELEASE = "ca-app-pub-4580352399728296/1070265357"
 
     private val rewardUnitId: String
         get() = if (BuildConfig.DEBUG) REWARD_UNIT_ID_TEST else REWARD_UNIT_ID_RELEASE
