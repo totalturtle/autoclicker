@@ -380,6 +380,27 @@ class OverlayService : Service() {
         }
     }
 
+    /** 프리미엄 전용 기능 안내 — 오버레이 위에 띄우고, 구매는 앱 화면에서 진행한다 */
+    private fun showPremiumDialog(message: String) {
+        if (isDialogShowing) return
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle(R.string.dialog_premium_title)
+            .setMessage(message)
+            .setNegativeButton("취소", null)
+            .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra("show_premium_dialog", true)
+                })
+            }
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
+    }
+
     /** 무료 위치 한도 안내 — 오버레이 위에 띄우고, 구매는 앱 화면에서 진행한다 */
     private fun showPointLimitDialog() {
         if (isDialogShowing) return
@@ -1019,7 +1040,7 @@ class OverlayService : Service() {
             if (checked && !PremiumManager.isPremium) {
                 d.cbTrigger.isChecked = false
                 d.groupTrigger.visibility = View.GONE
-                android.widget.Toast.makeText(this, "🔒 프리미엄 기능입니다. 설정 > 프리미엄 구매에서 이용하세요.", android.widget.Toast.LENGTH_SHORT).show()
+                showPremiumDialog(getString(R.string.premium_generic))
                 return@setOnCheckedChangeListener
             }
             d.groupTrigger.visibility = if (checked) View.VISIBLE else View.GONE
@@ -1028,7 +1049,7 @@ class OverlayService : Service() {
         d.cbStopLoopOnExecute.setOnCheckedChangeListener { _, checked ->
             if (checked && !PremiumManager.isPremium) {
                 d.cbStopLoopOnExecute.isChecked = false
-                android.widget.Toast.makeText(this, "🔒 프리미엄 기능입니다. 설정 > 프리미엄 구매에서 이용하세요.", android.widget.Toast.LENGTH_SHORT).show()
+                showPremiumDialog(getString(R.string.premium_generic))
             }
         }
         d.rgTriggerMode.setOnCheckedChangeListener { _, checkedId ->
@@ -1302,7 +1323,7 @@ class OverlayService : Service() {
 
     private fun showNewProfileNameDialog(themedCtx: Context, cfg: ClickSequenceConfig) {
         if (!PremiumManager.isPremium && ProfileManager.loadAll(this).filter { !it.simple }.size >= 2) {
-            Toast.makeText(this, "🔒 무료 버전은 프로필을 2개까지 저장할 수 있습니다. 설정 > 프리미엄 구매에서 이용하세요.", Toast.LENGTH_LONG).show()
+            showPremiumDialog(getString(R.string.premium_profile_count))
             isDialogShowing = false
             return
         }
@@ -1448,7 +1469,7 @@ class OverlayService : Service() {
                 contentDescription = profile.name
                 setOnClickListener {
                     if (!PremiumManager.isPremium) {
-                        Toast.makeText(this@OverlayService, "🔒 프리미엄 기능입니다.", Toast.LENGTH_SHORT).show()
+                        showPremiumDialog(getString(R.string.premium_quick_switch))
                         return@setOnClickListener
                     }
                     loadProfileAndStart(profile)
