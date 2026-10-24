@@ -385,9 +385,9 @@ class OverlayService : Service() {
         if (isDialogShowing) return
         isDialogShowing = true
         val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
-        val dialog = MaterialAlertDialogBuilder(themedCtx)
+        val builder = MaterialAlertDialogBuilder(themedCtx)
             .setTitle(R.string.dialog_point_limit_title)
-            .setMessage(getString(R.string.dialog_point_limit_msg, PremiumManager.FREE_POINT_LIMIT))
+            .setMessage(getString(R.string.dialog_point_limit_ad_msg, FreePass.pointLimit(this)))
             .setNegativeButton("취소", null)
             .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
                 startActivity(Intent(this, MainActivity::class.java).apply {
@@ -395,7 +395,16 @@ class OverlayService : Service() {
                     putExtra("show_premium_dialog", true)
                 })
             }
-            .create()
+        if (AdManager.isRewardAvailable) {
+            // 광고는 앱 화면에서만 재생할 수 있으므로 간단 모드 화면으로 넘겨 바로 띄운다
+            builder.setNeutralButton(R.string.btn_watch_ad) { _, _ ->
+                startActivity(Intent(this, SimpleModeActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(SimpleModeActivity.EXTRA_REQUEST_PASS, FreePass.EXTRA_POINT)
+                })
+            }
+        }
+        val dialog = builder.create()
         dialog.window?.setType(overlayType())
         dialog.setOnDismissListener { isDialogShowing = false }
         dialog.show()

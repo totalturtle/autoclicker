@@ -31,6 +31,9 @@ class SimpleModeActivity : AppCompatActivity() {
     companion object {
         /** 좌표 피커가 고른 좌표 — [CoordPickerService]가 채워 넣는다 */
         @Volatile var pickedCoord: Pair<Int, Int>? = null
+
+        /** 오버레이에서 "광고 보고 열기"를 눌렀을 때 넘어오는 이용권 키 */
+        const val EXTRA_REQUEST_PASS = "request_pass"
     }
 
     private lateinit var binding: ActivitySimpleModeBinding
@@ -73,6 +76,31 @@ class SimpleModeActivity : AppCompatActivity() {
         loadFromPrefs()
         registerBroadcasts()
         ensureOverlayServiceRunning()
+        handlePassRequest(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePassRequest(intent)
+    }
+
+    /** 오버레이에서 넘어온 "광고 보고 열기" 요청이면 바로 광고를 띄운다 */
+    private fun handlePassRequest(intent: Intent) {
+        val key = intent.getStringExtra(EXTRA_REQUEST_PASS) ?: return
+        intent.removeExtra(EXTRA_REQUEST_PASS)
+        if (PremiumManager.isPremium || FreePass.isActive(this, key)) return
+        AdManager.showRewarded(
+            this,
+            onReward = {
+                FreePass.grant(this, key)
+                Toast.makeText(this, R.string.toast_pass_granted, Toast.LENGTH_SHORT).show()
+                refreshUi()
+            },
+            onUnavailable = {
+                Toast.makeText(this, R.string.toast_ad_unavailable, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     override fun onResume() {
