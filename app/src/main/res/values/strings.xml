@@ -140,6 +140,9 @@
     <string name="toast_run_limit_reached">연속 실행 시간(%s)에 도달해 멈췄습니다.</string>
     <string name="pass_active_fmt">이용권 사용 중 · %s</string>
     <string name="run_limit_free">연속 실행 3시간까지 · 눌러서 24시간 열기</string>
+    <string name="plan_status_fmt">무료 · 위치 %1$d개 · 연속 실행 %2$s · 눌러서 자세히</string>
+    <string name="dialog_plan_status_title">지금 쓸 수 있는 범위</string>
+    <string name="btn_open_runtime">실행 시간 열기</string>
     <string name="simple_overlay_close">✕ 버튼 숨기기</string>
     <string name="simple_overlay_close_short">✕ 닫기</string>
     <string name="toast_overlay_closed">화면 위 버튼을 닫았습니다. 앱을 다시 열면 나타납니다.</string>

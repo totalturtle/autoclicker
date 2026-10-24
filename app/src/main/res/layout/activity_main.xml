@@ -52,6 +52,20 @@
             android:contentDescription="설정" />
     </LinearLayout>
 
+    <!-- 무료 한도 상태 (프리미엄이면 숨김) -->
+    <TextView
+        android:id="@+id/tvPlanStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:textColor="@color/simple_accent"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <!-- ── 스크롤 영역 ── -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
