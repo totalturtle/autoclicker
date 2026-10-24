@@ -307,7 +307,7 @@ class OverlayService : Service() {
         overlayView.findViewById<Button>(R.id.btnSimpleOverlayAdd).setOnClickListener {
             val cfg = SequencePrefs.load(this)
             val count = cfg?.points?.size ?: 0
-            if (!PremiumManager.isPremium && count >= PremiumManager.FREE_POINT_LIMIT) {
+            if (count >= FreePass.pointLimit(this)) {
                 showPointLimitDialog()
                 return@setOnClickListener
             }
@@ -622,7 +622,7 @@ class OverlayService : Service() {
 
     private fun addNewPoint() {
         val cfg = SequencePrefs.load(this) ?: ClickSequenceConfig(emptyList(), 1000L, 0)
-        if (!PremiumManager.isPremium && cfg.points.size >= PremiumManager.FREE_POINT_LIMIT) {
+        if (cfg.points.size >= FreePass.pointLimit(this)) {
             // 오버레이에서는 MainActivity로 이동해서 구매 다이얼로그 표시
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP

@@ -101,7 +101,7 @@ class SimpleModeActivity : AppCompatActivity() {
 
         binding.cardPickSingle.setOnClickListener { pickCoordinate() }
         binding.btnAddPoint.setOnClickListener {
-            if (!PremiumManager.isPremium && points.size >= PremiumManager.FREE_POINT_LIMIT) {
+            if (points.size >= FreePass.pointLimit(this)) {
                 showPointLimitDialog()
                 return@setOnClickListener
             }
@@ -117,6 +117,7 @@ class SimpleModeActivity : AppCompatActivity() {
         binding.btnSimpleSave.setOnClickListener { showSaveDialog() }
         binding.btnSimpleLoad.setOnClickListener { showLoadDialog() }
         binding.btnSimpleRecord.setOnClickListener { startRecording() }
+        binding.tvRunLimit.setOnClickListener { showRunLimitDialog() }
         binding.btnSimpleStart.setOnClickListener { if (isRunning) stopClicking() else startClicking() }
 
         binding.btnAdvancedMode.setOnClickListener { goAdvanced() }
@@ -168,6 +169,7 @@ class SimpleModeActivity : AppCompatActivity() {
 
         binding.rvSimplePoints.adapter?.notifyDataSetChanged()
         refreshRepeatUi()
+        refreshRunLimitUi()
     }
 
     private fun refreshRepeatUi() {
@@ -343,11 +345,69 @@ class SimpleModeActivity : AppCompatActivity() {
         refreshUi()
     }
 
+    /** 연속 실행 한도 안내 줄 — 프리미엄이면 숨긴다 */
+    private fun refreshRunLimitUi() {
+        val view = binding.tvRunLimit
+        when {
+            PremiumManager.isPremium -> view.visibility = View.GONE
+            FreePass.isActive(this, FreePass.LONG_RUN) -> {
+                view.visibility = View.VISIBLE
+                view.text = getString(
+                    R.string.pass_active_fmt,
+                    FreePass.remainingText(this, FreePass.LONG_RUN)
+                )
+            }
+            else -> {
+                view.visibility = View.VISIBLE
+                view.setText(R.string.run_limit_free)
+            }
+        }
+    }
+
+    /** 연속 실행 24시간 이용권 안내 */
+    private fun showRunLimitDialog() {
+        if (PremiumManager.isPremium) return
+        if (FreePass.isActive(this, FreePass.LONG_RUN)) {
+            Toast.makeText(
+                this,
+                getString(R.string.pass_active_fmt, FreePass.remainingText(this, FreePass.LONG_RUN)),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        showPassDialog(
+            titleRes = R.string.dialog_runtime_title,
+            message = getString(R.string.dialog_runtime_msg),
+            passKey = FreePass.LONG_RUN
+        )
+    }
+
     /** 무료 위치 한도에 걸렸을 때 구매를 안내한다 */
     private fun showPointLimitDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.dialog_point_limit_title)
-            .setMessage(getString(R.string.dialog_point_limit_msg, PremiumManager.FREE_POINT_LIMIT))
+        showPassDialog(
+            titleRes = R.string.dialog_point_limit_title,
+            message = getString(R.string.dialog_point_limit_ad_msg, FreePass.pointLimit(this)),
+            passKey = FreePass.EXTRA_POINT
+        )
+    }
+
+    /** 녹화 이용권 안내 */
+    private fun showRecordPassDialog() {
+        showPassDialog(
+            titleRes = R.string.dialog_record_title,
+            message = getString(R.string.dialog_record_msg),
+            passKey = FreePass.RECORDING
+        )
+    }
+
+    /**
+     * "광고 보고 24시간 열기 / 구매하기 / 취소" 팝업.
+     * 보상형 광고 단위가 설정되지 않은 빌드에서는 광고 버튼을 빼고 구매만 안내한다.
+     */
+    private fun showPassDialog(titleRes: Int, message: String, passKey: String) {
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(titleRes)
+            .setMessage(message)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
                 PremiumManager.launchPurchase(this) { success ->
@@ -357,7 +417,22 @@ class SimpleModeActivity : AppCompatActivity() {
                     }
                 }
             }
-            .show()
+        if (AdManager.isRewardAvailable) {
+            builder.setNeutralButton(R.string.btn_watch_ad) { _, _ ->
+                AdManager.showRewarded(
+                    this,
+                    onReward = {
+                        FreePass.grant(this, passKey)
+                        Toast.makeText(this, R.string.toast_pass_granted, Toast.LENGTH_SHORT).show()
+                        refreshUi()
+                    },
+                    onUnavailable = {
+                        Toast.makeText(this, R.string.toast_ad_unavailable, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+        builder.show()
     }
 
     /** 지정한 위치를 화면에 동그라미로 보여 준다 */
@@ -368,6 +443,10 @@ class SimpleModeActivity : AppCompatActivity() {
     // ── 녹화 ────────────────────────────────────────────────────────────
 
     private fun startRecording() {
+        if (!FreePass.canRecord(this)) {
+            showRecordPassDialog()
+            return
+        }
         if (!Settings.canDrawOverlays(this)) {
             openMissingPermission()
             return
@@ -400,8 +479,7 @@ class SimpleModeActivity : AppCompatActivity() {
             )
         }
         if (recorded.isEmpty()) return
-        val accepted = if (PremiumManager.isPremium) recorded
-                       else recorded.take(PremiumManager.FREE_POINT_LIMIT)
+        val accepted = recorded.take(FreePass.pointLimit(this))
         points.clear()
         points.addAll(accepted)
         changedHere = true

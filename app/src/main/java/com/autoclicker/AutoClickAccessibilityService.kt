@@ -10,6 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.widget.Toast
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Path
@@ -331,12 +334,20 @@ class AutoClickAccessibilityService : AccessibilityService() {
             var round = 0
             var totalClicks = 0
             var stopLoopRequested = false
+            // 무료 사용자의 연속 실행 한도(광고 이용권이 있으면 24시간, 프리미엄은 무제한)
+            val runLimitMs = FreePass.runLimitMs(this@AutoClickAccessibilityService)
+            val runDeadline = if (runLimitMs > 0L) System.currentTimeMillis() + runLimitMs else Long.MAX_VALUE
+            var hitRunLimit = false
             // 딜레이는 "다음 동작 직전"에 적용한다(첫 동작 제외).
             // 이렇게 하면 동작 사이 간격은 그대로 유지하되 마지막 동작 뒤 불필요한 대기를 없앤다.
             var prevDelayPoint: ClickPoint? = null
 
             fun shouldContinueGlobal(): Boolean {
                 if (stopLoopRequested) return false
+                if (System.currentTimeMillis() >= runDeadline) {
+                    hitRunLimit = true
+                    return false
+                }
                 return when (config.repeatMode) {
                     RepeatMode.COUNT    -> globalInfinite || round < config.repeatCount
                     RepeatMode.DURATION -> System.currentTimeMillis() < globalDeadline
@@ -384,7 +395,20 @@ class AutoClickAccessibilityService : AccessibilityService() {
                     }
                     round++
                 }
-                if (!globalInfinite || stopLoopRequested) broadcastStop()
+                if (hitRunLimit) {
+                    // 한도에 걸려 멈췄다는 것을 알려 준다
+                    val hours = runLimitMs / 3_600_000L
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@AutoClickAccessibilityService,
+                            getString(R.string.toast_run_limit_reached, "${hours}시간"),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    broadcastStop()
+                } else if (!globalInfinite || stopLoopRequested) {
+                    broadcastStop()
+                }
             } finally {
                 SessionLogger.endSession()
             }

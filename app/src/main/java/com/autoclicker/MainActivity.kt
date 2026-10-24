@@ -412,8 +412,10 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
-        // 녹화는 간단 모드와 같이 무료로 쓸 수 있다 (저장되는 포인트 수만 무료 한도를 따른다)
-        binding.btnRecordPoints.setOnClickListener { startRecording() }
+        binding.btnRecordPoints.setOnClickListener {
+            if (!FreePass.canRecord(this)) { showRecordPassDialog(); return@setOnClickListener }
+            startRecording()
+        }
         binding.btnAddPoint.setOnClickListener { addPointDirect() }
 
         var pointListCollapsed = false
@@ -534,6 +536,30 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    /** 녹화 이용권 안내 — 광고를 보면 24시간 열어 준다 */
+    fun showRecordPassDialog() {
+        val builder = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_record_title)
+            .setMessage(R.string.dialog_record_msg)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_buy_premium) { _, _ -> showPremiumDialog() }
+        if (AdManager.isRewardAvailable) {
+            builder.setNeutralButton(R.string.btn_watch_ad) { _, _ ->
+                AdManager.showRewarded(
+                    this,
+                    onReward = {
+                        FreePass.grant(this, FreePass.RECORDING)
+                        Toast.makeText(this, R.string.toast_pass_granted, Toast.LENGTH_SHORT).show()
+                    },
+                    onUnavailable = {
+                        Toast.makeText(this, R.string.toast_ad_unavailable, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+        builder.show()
+    }
+
     fun showPremiumDialog() {
         val baseMessage =
             "이 기능은 프리미엄 버전에서 사용할 수 있습니다.\n\n" +
@@ -596,8 +622,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         if (newPoints.isEmpty()) return
-        val room = if (PremiumManager.isPremium) newPoints.size
-                   else (PremiumManager.FREE_POINT_LIMIT - points.size).coerceAtLeast(0)
+        val room = (FreePass.pointLimit(this) - points.size).coerceAtLeast(0)
         val accepted = newPoints.take(room)
         points.addAll(accepted)
         pointAdapter.notifyDataSetChanged()
@@ -614,7 +639,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addPointDirect() {
-        if (!PremiumManager.isPremium && points.size >= PremiumManager.FREE_POINT_LIMIT) {
+        if (points.size >= FreePass.pointLimit(this)) {
             showPremiumDialog(); return
         }
         if (points.size >= 50) return

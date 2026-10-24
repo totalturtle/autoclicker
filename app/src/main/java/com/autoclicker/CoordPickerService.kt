@@ -527,6 +527,11 @@ class CoordPickerService : Service() {
                 val cfg = SequencePrefs.load(this) ?: ClickSequenceConfig(emptyList(), 1000L, 0)
                 val newPoint = ClickPoint(x = x, y = y)
                 val single = !AppPreferences.isSimpleMulti(this)
+                if (!single && cfg.points.size >= FreePass.pointLimit(this)) {
+                    Toast.makeText(this, R.string.premium_point_limit, Toast.LENGTH_LONG).show()
+                    stopSelf()
+                    return
+                }
                 val updated = if (single) cfg.copy(points = listOf(newPoint))
                               else cfg.copy(points = cfg.points + newPoint)
                 SequencePrefs.save(this, updated)
