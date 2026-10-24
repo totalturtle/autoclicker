@@ -308,7 +308,7 @@ class OverlayService : Service() {
             val cfg = SequencePrefs.load(this)
             val count = cfg?.points?.size ?: 0
             if (!PremiumManager.isPremium && count >= PremiumManager.FREE_POINT_LIMIT) {
-                Toast.makeText(this, R.string.premium_point_limit, Toast.LENGTH_LONG).show()
+                showPointLimitDialog()
                 return@setOnClickListener
             }
             startService(Intent(this, CoordPickerService::class.java).apply {
@@ -378,6 +378,27 @@ class OverlayService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
+    }
+
+    /** 무료 위치 한도 안내 — 오버레이 위에 띄우고, 구매는 앱 화면에서 진행한다 */
+    private fun showPointLimitDialog() {
+        if (isDialogShowing) return
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle(R.string.dialog_point_limit_title)
+            .setMessage(getString(R.string.dialog_point_limit_msg, PremiumManager.FREE_POINT_LIMIT))
+            .setNegativeButton("취소", null)
+            .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
+                startActivity(Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra("show_premium_dialog", true)
+                })
+            }
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
     }
 
     /** 오버레이를 닫는다. 실행 중이면 먼저 멈춘다. */

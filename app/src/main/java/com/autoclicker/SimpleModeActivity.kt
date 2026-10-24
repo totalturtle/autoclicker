@@ -102,7 +102,7 @@ class SimpleModeActivity : AppCompatActivity() {
         binding.cardPickSingle.setOnClickListener { pickCoordinate() }
         binding.btnAddPoint.setOnClickListener {
             if (!PremiumManager.isPremium && points.size >= PremiumManager.FREE_POINT_LIMIT) {
-                Toast.makeText(this, R.string.premium_point_limit, Toast.LENGTH_LONG).show()
+                showPointLimitDialog()
                 return@setOnClickListener
             }
             pickCoordinate()
@@ -341,6 +341,23 @@ class SimpleModeActivity : AppCompatActivity() {
         multiMode = points.size > 1
         AppPreferences.setSimpleMulti(this, multiMode)
         refreshUi()
+    }
+
+    /** 무료 위치 한도에 걸렸을 때 구매를 안내한다 */
+    private fun showPointLimitDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.dialog_point_limit_title)
+            .setMessage(getString(R.string.dialog_point_limit_msg, PremiumManager.FREE_POINT_LIMIT))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.btn_buy_premium) { _, _ ->
+                PremiumManager.launchPurchase(this) { success ->
+                    if (success) {
+                        Toast.makeText(this, R.string.toast_premium_upgraded, Toast.LENGTH_SHORT).show()
+                        refreshUi()
+                    }
+                }
+            }
+            .show()
     }
 
     /** 지정한 위치를 화면에 동그라미로 보여 준다 */
