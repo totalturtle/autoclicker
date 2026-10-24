@@ -522,14 +522,19 @@ class CoordPickerService : Service() {
         dismiss()
         when (target) {
             TARGET_SIMPLE_ADD -> {
-                // 앱으로 돌아가지 않고 그 자리에서 포인트를 추가한다
+                // 앱으로 돌아가지 않고 그 자리에서 위치를 지정한다.
+                // "한 곳 반복"이면 기존 위치를 바꾸고, "여러 곳 순서대로"면 뒤에 더한다.
                 val cfg = SequencePrefs.load(this) ?: ClickSequenceConfig(emptyList(), 1000L, 0)
-                val updated = cfg.copy(points = cfg.points + ClickPoint(x = x, y = y))
+                val newPoint = ClickPoint(x = x, y = y)
+                val single = !AppPreferences.isSimpleMulti(this)
+                val updated = if (single) cfg.copy(points = listOf(newPoint))
+                              else cfg.copy(points = cfg.points + newPoint)
                 SequencePrefs.save(this, updated)
                 sendBroadcast(Intent(OverlayService.ACTION_SHOW_MARKERS).apply { setPackage(packageName) })
                 Toast.makeText(
                     this,
-                    getString(R.string.simple_point_added_fmt, updated.points.size),
+                    if (single) getString(R.string.simple_point_set)
+                    else getString(R.string.simple_point_added_fmt, updated.points.size),
                     Toast.LENGTH_SHORT
                 ).show()
             }
