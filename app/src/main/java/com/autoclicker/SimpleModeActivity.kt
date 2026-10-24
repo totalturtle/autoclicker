@@ -40,6 +40,13 @@ class SimpleModeActivity : AppCompatActivity() {
     private var repeatForever = true
     private var isRunning = false
 
+    /**
+     * 이 화면에서 위치를 직접 바꿨는지.
+     * 모든 기능 화면으로 넘어갈 때 "간단 모드에서 만든 것"만 지우려고 쓴다.
+     * 그냥 들렀다 나가는 경우에는 고급 화면에서 만든 설정을 건드리지 않는다.
+     */
+    private var changedHere = false
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -218,6 +225,7 @@ class SimpleModeActivity : AppCompatActivity() {
             points.clear()
             points.add(point)
         }
+        changedHere = true
         persist()
         refreshUi()
         showMarkers()
@@ -228,11 +236,17 @@ class SimpleModeActivity : AppCompatActivity() {
      * 간단 모드에서 만든 위치는 지우고 간다 — 저장해 둔 설정은 그대로 남는다.
      */
     private fun goAdvanced() {
-        points.clear()
-        SequencePrefs.save(this, ClickSequenceConfig(emptyList(), readIntervalMs().coerceAtLeast(100L), 0))
-        showMarkers()
+        if (changedHere) {
+            // 간단 모드에서 만든 것만 정리한다
+            points.clear()
+            SequencePrefs.save(this, ClickSequenceConfig(emptyList(), readIntervalMs().coerceAtLeast(100L), 0))
+            showMarkers()
+            Toast.makeText(this, R.string.simple_clear_on_switch, Toast.LENGTH_SHORT).show()
+        } else {
+            // 들렀다 나가는 것뿐이면 고급 화면에서 만든 설정을 그대로 둔다
+            persist()
+        }
         AppPreferences.setSimpleModeStart(this, false)
-        Toast.makeText(this, R.string.simple_clear_on_switch, Toast.LENGTH_SHORT).show()
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
@@ -318,6 +332,7 @@ class SimpleModeActivity : AppCompatActivity() {
 
     /** 불러온 설정을 화면에 반영한다. */
     private fun applyConfig(cfg: ClickSequenceConfig) {
+        changedHere = true
         points.clear()
         points.addAll(cfg.points)
         DelayUnit.fill(binding.etSimpleInterval, binding.spSimpleUnit, cfg.globalDelayMs)
@@ -372,6 +387,7 @@ class SimpleModeActivity : AppCompatActivity() {
                        else recorded.take(PremiumManager.FREE_POINT_LIMIT)
         points.clear()
         points.addAll(accepted)
+        changedHere = true
         if (points.size > 1 && !multiMode) setMultiMode(true)
         persist()
         refreshUi()
@@ -544,6 +560,7 @@ class SimpleModeActivity : AppCompatActivity() {
                 val index = holder.bindingAdapterPosition
                 if (index !in points.indices) return@setOnClickListener
                 points.removeAt(index)
+                changedHere = true
                 persist()
                 refreshUi()
                 showMarkers()
