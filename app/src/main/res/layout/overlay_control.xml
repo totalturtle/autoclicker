@@ -240,6 +240,18 @@
             android:textSize="9sp" />
 
         <Button
+            android:id="@+id/btnSimpleOverlayReset"
+            android:layout_width="42dp"
+            android:layout_height="30dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_simple_outline"
+            android:padding="0dp"
+            android:stateListAnimator="@null"
+            android:text="초기화"
+            android:textColor="@color/text_secondary"
+            android:textSize="9sp" />
+
+        <Button
             android:id="@+id/btnSimpleOverlayRecord"
             android:layout_width="42dp"
             android:layout_height="34dp"

@@ -290,15 +290,11 @@ class OverlayService : Service() {
             setMarkersVisible(!markersVisible)
         }
 
-        overlayView.findViewById<Button>(R.id.btnOverlayReset).setOnClickListener {
-            if (isRunning) {
-                sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
-            }
-            val empty = SequencePrefs.load(this)?.copy(points = emptyList())
-                ?: ClickSequenceConfig(emptyList(), 1000L, 0)
-            SequencePrefs.save(this, empty)
-            sequenceJson = empty.toJsonString()
-            clearMarkers()
+        overlayView.findViewById<Button>(R.id.btnOverlayReset).setOnClickListener { resetPoints() }
+
+        // 간단 모드: 지정한 위치 전부 지우기 (실수로 누르지 않게 한 번 묻는다)
+        overlayView.findViewById<Button>(R.id.btnSimpleOverlayReset).setOnClickListener {
+            confirmResetPoints()
         }
 
         overlayView.findViewById<ImageButton>(R.id.btnOverlayPower).setOnClickListener { closeOverlay() }
@@ -383,6 +379,42 @@ class OverlayService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
+    }
+
+    /** 지정한 위치를 모두 지운다 */
+    private fun resetPoints() {
+        if (isRunning) {
+            sendBroadcast(Intent(AutoClickAccessibilityService.ACTION_STOP).apply { setPackage(packageName) })
+        }
+        val empty = SequencePrefs.load(this)?.copy(points = emptyList())
+            ?: ClickSequenceConfig(emptyList(), 1000L, 0)
+        SequencePrefs.save(this, empty)
+        sequenceJson = empty.toJsonString()
+        clearMarkers()
+    }
+
+    /** 초기화 전에 한 번 확인한다 */
+    private fun confirmResetPoints() {
+        val count = SequencePrefs.load(this)?.points?.size ?: 0
+        if (count == 0) {
+            Toast.makeText(this, R.string.toast_no_points_to_reset, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (isDialogShowing) return
+        isDialogShowing = true
+        val themedCtx = ContextThemeWrapper(this, R.style.Theme_AutoClicker)
+        val dialog = MaterialAlertDialogBuilder(themedCtx)
+            .setTitle(R.string.dialog_reset_points_title)
+            .setMessage(getString(R.string.dialog_reset_points_msg, count))
+            .setNegativeButton("취소", null)
+            .setPositiveButton(R.string.btn_delete) { _, _ ->
+                resetPoints()
+                Toast.makeText(this, R.string.toast_points_reset, Toast.LENGTH_SHORT).show()
+            }
+            .create()
+        dialog.window?.setType(overlayType())
+        dialog.setOnDismissListener { isDialogShowing = false }
+        dialog.show()
     }
 
     /**
@@ -556,6 +588,7 @@ class OverlayService : Service() {
         overlayView.findViewById<View>(R.id.dividerSimpleOverlay)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayRecord)?.visibility = vis
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayReset)?.visibility = vis
         overlayView.findViewById<View>(R.id.btnSimpleOverlayClose)?.visibility = vis
     }
 
@@ -585,6 +618,7 @@ class OverlayService : Service() {
         val editable = if (running || simpleCollapsed) View.GONE else View.VISIBLE
         overlayView.findViewById<View>(R.id.btnSimpleOverlayAdd)?.visibility = editable
         overlayView.findViewById<View>(R.id.btnSimpleOverlayRecord)?.visibility = editable
+        overlayView.findViewById<View>(R.id.btnSimpleOverlayReset)?.visibility = editable
         // 실행 중엔 마커 숨김, 정지 시 사용자 설정 상태로 복원
         val v = if (markersVisible && !running) View.VISIBLE else View.INVISIBLE
         markers.forEach { it.view.visibility = v }
