@@ -21,3 +21,6 @@ keystore.properties
 
 # Claude Code 내부 워크트리
 .claude/worktrees/
+
+# Kotlin 빌드 도구 캐시
+.kotlin/
