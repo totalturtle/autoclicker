@@ -107,6 +107,7 @@ class SimpleModeActivity : AppCompatActivity() {
         super.onResume()
         consumePickedCoord()
         updatePermissionBanner()
+        AdManager.prefetch(this)
         setRunningState(AutoClickAccessibilityService.isRunning)
         if (!isRunning && points.isNotEmpty()) showMarkers()
     }

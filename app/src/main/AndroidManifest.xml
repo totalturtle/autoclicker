@@ -23,7 +23,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AutoClicker">
 
-        <!-- AdMob App ID (테스트용 — 실제 배포 전 콘솔에서 발급받은 ID로 교체) -->
+        <!-- AdMob 앱 ID (AdMob 콘솔에서 발급받은 실제 ID) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-4580352399728296~4124929525" />

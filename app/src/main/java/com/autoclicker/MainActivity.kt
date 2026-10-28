@@ -219,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionStatus()
         updatePlanStatus()
+        AdManager.prefetch(this)
         handlePickedCoord()
         syncPointsFromPrefs()
         ensureOverlayServiceRunning()
